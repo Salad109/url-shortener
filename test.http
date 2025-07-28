@@ -1,0 +1,10 @@
+POST localhost:8080/shorten
+Content-Type: application/json
+
+{
+  "originalUrl": "https://youtu.be/dQw4w9WgXcQ"
+}
+
+###
+
+GET localhost:8080/1oeAzR

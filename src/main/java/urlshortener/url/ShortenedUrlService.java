@@ -1,0 +1,36 @@
+package urlshortener.url;
+
+import org.springframework.stereotype.Service;
+import urlshortener.transcoding.Base62Converter;
+import urlshortener.transcoding.IdScrambler;
+
+import java.util.Optional;
+
+@Service
+public class ShortenedUrlService {
+
+    ShortenedUrlRepository shortenedUrlRepository;
+
+    ShortenedUrlService(ShortenedUrlRepository shortenedUrlRepository) {
+        this.shortenedUrlRepository = shortenedUrlRepository;
+    }
+
+    public String shortenUrl(String originalUrl) {
+        ShortenedUrl shortenedUrl = new ShortenedUrl(originalUrl);
+        ShortenedUrl shortenedUrlEntity = shortenedUrlRepository.save(shortenedUrl);
+
+        long scrambledId = IdScrambler.encode(shortenedUrlEntity.getId());
+        return Base62Converter.encode(scrambledId);
+    }
+
+    public String getOriginalUrl(String code) {
+        long decodedId = Base62Converter.decode(code);
+        long originalId = IdScrambler.decode(decodedId);
+
+        Optional<ShortenedUrl> shortenedUrl = shortenedUrlRepository.findById(originalId);
+        if (shortenedUrl.isEmpty()) {
+            throw new IllegalArgumentException("Short URL not found");
+        }
+        return shortenedUrl.get().getOriginalUrl();
+    }
+}
