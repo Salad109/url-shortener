@@ -5,6 +5,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.view.RedirectView;
 import urlshortener.dto.ShortenRequest;
+import urlshortener.dto.ShortenedUrlStats;
 
 @RestController
 public class ShortenedUrlController {
@@ -25,5 +26,10 @@ public class ShortenedUrlController {
     public RedirectView getOriginalUrl(@PathVariable String code) {
         String originalUrl = shortenedUrlService.getOriginalUrl(code);
         return new RedirectView(originalUrl);
+    }
+
+    @GetMapping("/stats/{code}")
+    public ShortenedUrlStats getShortenedUrlStats(@PathVariable String code) {
+        return shortenedUrlService.getShortenedUrlStats(code);
     }
 }

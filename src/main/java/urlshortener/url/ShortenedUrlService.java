@@ -1,6 +1,7 @@
 package urlshortener.url;
 
 import org.springframework.stereotype.Service;
+import urlshortener.dto.ShortenedUrlStats;
 import urlshortener.transcoding.Base62Converter;
 import urlshortener.transcoding.IdScrambler;
 
@@ -37,5 +38,18 @@ public class ShortenedUrlService {
         shortenedUrlRepository.save(shortenedUrl.get());
 
         return shortenedUrl.get().getOriginalUrl();
+    }
+
+    public ShortenedUrlStats getShortenedUrlStats(String code) {
+        long decodedId = Base62Converter.decode(code);
+        long originalId = IdScrambler.decode(decodedId);
+
+        Optional<ShortenedUrl> shortenedUrl = shortenedUrlRepository.findById(originalId);
+        if (shortenedUrl.isEmpty()) {
+            throw new IllegalArgumentException("Short URL not found");
+        }
+
+        ShortenedUrl url = shortenedUrl.get();
+        return new ShortenedUrlStats(code, url.getOriginalUrl(), url.getClickCounter());
     }
 }
