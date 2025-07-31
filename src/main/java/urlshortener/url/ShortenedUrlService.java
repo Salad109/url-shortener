@@ -6,6 +6,7 @@ import urlshortener.dto.ShortenedUrlStats;
 import urlshortener.transcoding.Base62Converter;
 import urlshortener.transcoding.IdScrambler;
 
+import java.time.Instant;
 import java.util.Optional;
 
 @Service
@@ -35,6 +36,7 @@ public class ShortenedUrlService {
         }
 
         shortenedUrl.get().incrementClickCounter();
+        shortenedUrl.get().setLastClickedAt(Instant.now());
 
         shortenedUrlRepository.save(shortenedUrl.get());
 
@@ -51,6 +53,6 @@ public class ShortenedUrlService {
         }
 
         ShortenedUrl url = shortenedUrl.get();
-        return new ShortenedUrlStats(code, url.getOriginalUrl(), url.getClickCounter());
+        return new ShortenedUrlStats(code, url.getOriginalUrl(), url.getClickCounter(), url.getCreatedAt(), url.getLastClickedAt());
     }
 }

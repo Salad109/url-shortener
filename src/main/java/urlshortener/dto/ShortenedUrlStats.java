@@ -1,4 +1,11 @@
 package urlshortener.dto;
 
-public record ShortenedUrlStats(String code, String originalUrl, long clickCounter) {
+import java.time.Instant;
+
+public record ShortenedUrlStats(
+        String code,
+        String originalUrl,
+        long clickCounter,
+        Instant createdAt,
+        Instant lastClickedAt) {
 }
