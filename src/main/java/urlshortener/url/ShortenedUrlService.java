@@ -1,5 +1,6 @@
 package urlshortener.url;
 
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 import urlshortener.dto.ShortenedUrlStats;
 import urlshortener.transcoding.Base62Converter;
@@ -30,7 +31,7 @@ public class ShortenedUrlService {
 
         Optional<ShortenedUrl> shortenedUrl = shortenedUrlRepository.findById(originalId);
         if (shortenedUrl.isEmpty()) {
-            throw new IllegalArgumentException("Short URL not found");
+            throw new EntityNotFoundException("Short URL not found");
         }
 
         shortenedUrl.get().incrementClickCounter();
@@ -46,7 +47,7 @@ public class ShortenedUrlService {
 
         Optional<ShortenedUrl> shortenedUrl = shortenedUrlRepository.findById(originalId);
         if (shortenedUrl.isEmpty()) {
-            throw new IllegalArgumentException("Short URL not found");
+            throw new EntityNotFoundException("Short URL not found");
         }
 
         ShortenedUrl url = shortenedUrl.get();
