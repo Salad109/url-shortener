@@ -11,6 +11,8 @@ public class ShortenedUrl {
 
     private String originalUrl;
 
+    private int clickCounter = 0;
+
     public ShortenedUrl() {
     }
 
@@ -30,4 +32,11 @@ public class ShortenedUrl {
         this.originalUrl = originalUrl;
     }
 
+    public int getClickCounter() {
+        return clickCounter;
+    }
+
+    public void incrementClickCounter() {
+        clickCounter++;
+    }
 }

@@ -31,6 +31,11 @@ public class ShortenedUrlService {
         if (shortenedUrl.isEmpty()) {
             throw new IllegalArgumentException("Short URL not found");
         }
+
+        shortenedUrl.get().incrementClickCounter();
+
+        shortenedUrlRepository.save(shortenedUrl.get());
+
         return shortenedUrl.get().getOriginalUrl();
     }
 }
