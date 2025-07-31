@@ -8,3 +8,16 @@ Content-Type: application/json
 ###
 
 GET localhost:8080/1oeAzR
+
+###
+
+POST localhost:8080/shorten
+Content-Type: application/json
+
+{
+  "originalUrl": "glorp"
+}
+
+###
+
+GET localhost:8080/1HxjNr

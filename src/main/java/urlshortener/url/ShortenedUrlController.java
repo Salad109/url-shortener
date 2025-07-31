@@ -1,5 +1,6 @@
 package urlshortener.url;
 
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 import urlshortener.dto.ShortenRequest;
 
@@ -13,7 +14,7 @@ public class ShortenedUrlController {
     }
 
     @PostMapping("/shorten")
-    public String shortenUrl(@RequestBody ShortenRequest request) {
+    public String shortenUrl(@Valid @RequestBody ShortenRequest request) {
         return shortenedUrlService.shortenUrl(request.originalUrl());
     }
 
