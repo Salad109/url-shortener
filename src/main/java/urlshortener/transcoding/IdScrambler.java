@@ -1,11 +1,9 @@
 package urlshortener.transcoding;
 
 public class IdScrambler {
-    private static final long MAX_VALUE = 2_147_483_647L;
-    private static final long LARGE_PRIME = 1_664_525_001L;
-
-    // Pre-calculated using Extended Euclidean Algorithm
-    private static final long INVERSE = 38544865L;
+    private static final long MAX_VALUE = 916_132_831L; // 65^5 - 1
+    private static final long LARGE_PRIME = 687_194_767L;
+    private static final long INVERSE = 490_572_491L; // Pre-calculated using Extended Euclidean Algorithm
 
     public static long encode(long id) {
         if (id <= 0 || id >= MAX_VALUE) {

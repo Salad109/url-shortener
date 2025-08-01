@@ -7,11 +7,11 @@ Content-Type: application/json
 
 ###
 
-GET localhost:8080/1oeAzR
+GET localhost:8080/kVOkZ
 
 ###
 
-GET localhost:8080/stats/1oeAzR
+GET localhost:8080/stats/kVOkZ
 
 ###
 
@@ -24,8 +24,8 @@ Content-Type: application/json
 
 ###
 
-GET localhost:8080/1HxjNr
+GET localhost:8080/V0nV9
 
 ###
 
-GET localhost:8080/stats/1HxjNr
+GET localhost:8080/stats/V0nV9

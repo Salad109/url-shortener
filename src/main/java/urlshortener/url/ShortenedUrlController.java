@@ -23,7 +23,7 @@ public class ShortenedUrlController {
     }
 
     @GetMapping("/{code}")
-    public RedirectView getOriginalUrl(@PathVariable String code) {
+    public RedirectView redirect(@PathVariable String code) {
         String originalUrl = shortenedUrlService.getOriginalUrl(code);
         return new RedirectView(originalUrl);
     }
