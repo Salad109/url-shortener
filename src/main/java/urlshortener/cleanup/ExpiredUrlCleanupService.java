@@ -13,7 +13,7 @@ import java.time.temporal.ChronoUnit;
 @Service
 public class ExpiredUrlCleanupService {
 
-    private static final Logger logger = LoggerFactory.getLogger(ExpiredUrlCleanupService.class);
+    private static final Logger log = LoggerFactory.getLogger(ExpiredUrlCleanupService.class);
     private final ShortenedUrlRepository repository;
 
     public ExpiredUrlCleanupService(ShortenedUrlRepository repository) {
@@ -23,12 +23,12 @@ public class ExpiredUrlCleanupService {
     @Scheduled(fixedRate = 15 * 60 * 1000) // 15 minutes
     @Transactional
     public void cleanupExpiredUrls() {
-        logger.info("Starting cleanup of expired URLs");
+        log.info("Starting cleanup of expired URLs");
 
-        Instant fiveMinutesAgo = Instant.now().minus(5, ChronoUnit.MINUTES);
+        Instant fiveMinutesAgo = Instant.now().minus(15, ChronoUnit.MINUTES);
 
         int deletedCount = repository.deleteExpiredUrls(fiveMinutesAgo);
 
-        logger.info("Cleanup completed. Deleted {} expired URLs", deletedCount);
+        log.info("Cleanup completed. Deleted {} expired URLs", deletedCount);
     }
 }
