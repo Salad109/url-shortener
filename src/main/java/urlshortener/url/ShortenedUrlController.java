@@ -1,6 +1,7 @@
 package urlshortener.url;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.view.RedirectView;
@@ -23,7 +24,7 @@ public class ShortenedUrlController {
     }
 
     @GetMapping("/{code}")
-    public RedirectView redirect(@PathVariable String code) {
+    public RedirectView redirect(@PathVariable @NotBlank String code) {
         String originalUrl = shortenedUrlService.getOriginalUrl(code);
         return new RedirectView(originalUrl);
     }

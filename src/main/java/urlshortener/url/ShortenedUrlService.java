@@ -27,23 +27,26 @@ public class ShortenedUrlService {
     }
 
     public String getOriginalUrl(String code) {
-        long decodedId = Base62Converter.decode(code);
-        long originalId = IdScrambler.decode(decodedId);
+        ShortenedUrl url = getShortUrlOrThrow(code);
 
-        Optional<ShortenedUrl> shortenedUrl = shortenedUrlRepository.findById(originalId);
-        if (shortenedUrl.isEmpty()) {
-            throw new EntityNotFoundException("Short URL not found");
-        }
+        url.incrementClickCounter();
+        url.setLastClickedAt(Instant.now());
 
-        shortenedUrl.get().incrementClickCounter();
-        shortenedUrl.get().setLastClickedAt(Instant.now());
+        shortenedUrlRepository.save(url);
 
-        shortenedUrlRepository.save(shortenedUrl.get());
-
-        return shortenedUrl.get().getOriginalUrl();
+        return url.getOriginalUrl();
     }
 
     public ShortenedUrlStats getShortenedUrlStats(String code) {
+        ShortenedUrl url = getShortUrlOrThrow(code);
+        return new ShortenedUrlStats(code, url.getOriginalUrl(), url.getClickCounter(), url.getCreatedAt(), url.getLastClickedAt());
+    }
+
+    private ShortenedUrl getShortUrlOrThrow(String code) {
+        if (code.length() > 5) {
+            throw new EntityNotFoundException("Short URL not found");
+        }
+
         long decodedId = Base62Converter.decode(code);
         long originalId = IdScrambler.decode(decodedId);
 
@@ -51,8 +54,6 @@ public class ShortenedUrlService {
         if (shortenedUrl.isEmpty()) {
             throw new EntityNotFoundException("Short URL not found");
         }
-
-        ShortenedUrl url = shortenedUrl.get();
-        return new ShortenedUrlStats(code, url.getOriginalUrl(), url.getClickCounter(), url.getCreatedAt(), url.getLastClickedAt());
+        return shortenedUrl.get();
     }
 }

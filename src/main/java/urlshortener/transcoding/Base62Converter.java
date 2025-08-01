@@ -6,9 +6,6 @@ public class Base62Converter {
     private static final int BASE = BASE62_ALPHABET.length();
 
     public static String encode(long id) {
-        if (id < 0) {
-            throw new IllegalArgumentException("ID must be non-negative");
-        }
         StringBuilder encoded = new StringBuilder();
         do {
             encoded.append(BASE62_ALPHABET.charAt((int) (id % BASE)));
@@ -18,13 +15,10 @@ public class Base62Converter {
     }
 
     public static long decode(String base62) {
-        if (base62 == null || base62.isEmpty()) {
-            throw new IllegalArgumentException("Base62 string must not be null or empty");
-        }
         long decoded = 0;
         for (char c : base62.toCharArray()) {
             int index = BASE62_ALPHABET.indexOf(c);
-            if (index < 0) {
+            if (index == -1) {
                 throw new IllegalArgumentException("Invalid character in Base62 string: " + c);
             }
             decoded = decoded * BASE + index;
