@@ -2,7 +2,7 @@ POST localhost:8080/shorten
 Content-Type: application/json
 
 {
-  "originalUrl": "https://youtu.be/dQw4w9WgXcQ"
+  "originalUrl": "https://example.com"
 }
 
 ###
@@ -15,17 +15,17 @@ GET localhost:8080/stats/kVOkZ
 
 ###
 
+GET localhost:8080/V0nV9
+
+###
+
+GET localhost:8080/stats/V0nV9
+
+###
+
 POST localhost:8080/shorten
 Content-Type: application/json
 
 {
   "originalUrl": "glorp"
 }
-
-###
-
-GET localhost:8080/V0nV9
-
-###
-
-GET localhost:8080/stats/V0nV9

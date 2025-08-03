@@ -20,14 +20,15 @@ public class ExpiredUrlCleanupService {
         this.repository = repository;
     }
 
-    @Scheduled(fixedRate = 15 * 60 * 1000) // 15 minutes
+    // Deleted every 5-6 minutes
+    @Scheduled(fixedRate = 60 * 1000)
     @Transactional
     public void cleanupExpiredUrls() {
         log.info("Starting cleanup of expired URLs");
 
-        Instant fiveMinutesAgo = Instant.now().minus(15, ChronoUnit.MINUTES);
+        Instant offset = Instant.now().minus(5, ChronoUnit.MINUTES);
 
-        int deletedCount = repository.deleteExpiredUrls(fiveMinutesAgo);
+        int deletedCount = repository.deleteExpiredUrls(offset);
 
         log.info("Cleanup completed. Deleted {} expired URLs", deletedCount);
     }
