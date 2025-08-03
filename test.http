@@ -1,3 +1,5 @@
+### Shorten a URL
+
 POST localhost:8080/shorten
 Content-Type: application/json
 
@@ -5,23 +7,23 @@ Content-Type: application/json
   "originalUrl": "https://example.com"
 }
 
-###
+### Use shortened URL and get redirected
 
 GET localhost:8080/kVOkZ
 
-###
+### Stats for the shortened URL
 
 GET localhost:8080/stats/kVOkZ
 
-###
+### Second shortened URL code
 
 GET localhost:8080/V0nV9
 
-###
+### Second shortened URL stats
 
 GET localhost:8080/stats/V0nV9
 
-###
+### Invalid URL shortening request
 
 POST localhost:8080/shorten
 Content-Type: application/json
