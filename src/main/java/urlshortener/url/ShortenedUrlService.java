@@ -1,8 +1,10 @@
 package urlshortener.url;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.persistence.EntityNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.repository.CrudRepository;
 import org.springframework.stereotype.Service;
 import urlshortener.dto.ShortenedUrlStats;
 import urlshortener.transcoding.Base62Converter;
@@ -17,8 +19,10 @@ public class ShortenedUrlService {
     private static final Logger log = LoggerFactory.getLogger(ShortenedUrlService.class);
     ShortenedUrlRepository shortenedUrlRepository;
 
-    ShortenedUrlService(ShortenedUrlRepository shortenedUrlRepository) {
+    ShortenedUrlService(ShortenedUrlRepository shortenedUrlRepository, MeterRegistry meterRegistry) {
         this.shortenedUrlRepository = shortenedUrlRepository;
+
+        meterRegistry.gauge("shortened_urls_total", shortenedUrlRepository, CrudRepository::count);
     }
 
     public String shortenUrl(String originalUrl) {
