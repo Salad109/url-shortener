@@ -25,7 +25,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler({EntityNotFoundException.class, IllegalArgumentException.class})
-    public ResponseEntity<String> handleEntityNotFound(Exception ex) {
+    public ResponseEntity<String> handleEntityNotFound(Exception ignoredEx) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Short URL not found");
     }
 }

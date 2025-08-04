@@ -20,11 +20,6 @@ public class ShortenedUrl {
         this.lastClickedAt = null;
     }
 
-    public ShortenedUrl(String originalUrl) {
-        this();
-        this.originalUrl = originalUrl;
-    }
-
     public Long getId() {
         return id;
     }

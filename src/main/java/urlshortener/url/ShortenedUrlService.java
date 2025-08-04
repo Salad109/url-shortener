@@ -27,7 +27,8 @@ public class ShortenedUrlService {
 
     public String shortenUrl(String originalUrl) {
         log.debug("Shortening URL: {}", originalUrl);
-        ShortenedUrl shortenedUrl = new ShortenedUrl(originalUrl);
+        ShortenedUrl shortenedUrl = new ShortenedUrl();
+        shortenedUrl.setOriginalUrl(originalUrl);
         ShortenedUrl shortenedUrlEntity = shortenedUrlRepository.save(shortenedUrl);
 
         long scrambledId = IdScrambler.encode(shortenedUrlEntity.getId());
