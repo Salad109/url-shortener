@@ -59,7 +59,7 @@ public class ShortenedUrlService {
     private ShortenedUrl getShortUrlOrThrow(String code) {
         if (code.length() > 5) {
             log.debug("Code {} has invalid length: {}", code, code.length());
-            throw new EntityNotFoundException("Short URL not found");
+            throw new IllegalArgumentException("Short URL code must be 5 characters long");
         }
 
         long decodedId = Base62Converter.decode(code);
@@ -68,7 +68,7 @@ public class ShortenedUrlService {
         Optional<ShortenedUrl> shortenedUrl = shortenedUrlRepository.findById(originalId);
         if (shortenedUrl.isEmpty()) {
             log.debug("Short URL not found for code: {}, ID: {}", code, originalId);
-            throw new EntityNotFoundException("Short URL not found");
+            throw new EntityNotFoundException();
         }
 
         ShortenedUrl foundUrl = shortenedUrl.get();

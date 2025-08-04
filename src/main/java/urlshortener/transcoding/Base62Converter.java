@@ -5,6 +5,9 @@ public class Base62Converter {
     private static final String BASE62_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
     private static final int BASE = BASE62_ALPHABET.length();
 
+    private Base62Converter() {
+    }
+
     public static String encode(long id) {
         StringBuilder encoded = new StringBuilder();
         do {
