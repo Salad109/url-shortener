@@ -5,6 +5,7 @@ public class IdScrambler {
     private static final long MAX_VALUE = 916_132_831L; // 65^5 - 1
     private static final long LARGE_PRIME = 687_194_767L;
     private static final long INVERSE = 490_572_491L; // Pre-calculated using Extended Euclidean Algorithm
+
     private IdScrambler() {
     }
 

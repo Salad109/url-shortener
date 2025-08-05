@@ -74,10 +74,14 @@ curl http://localhost:8080/stats/kVOkZ
 # Returns: click count, creation time, last click time
 ```
 
-## Built with
-
-Java 21, Spring Boot, SQLite, Prometheus, Grafana.
-
 Auto-cleanup service removes unused URLs after 5 minutes since last click or creation for demonstration purposes.
 
 See `test.http` for example requests you can run directly.
+
+## Tech Stack
+
+- Java 21 + Spring Boot
+- SQLite
+- Prometheus + Grafana
+- Docker Compose
+- JUnit 5 + AssertJ + Mockito
