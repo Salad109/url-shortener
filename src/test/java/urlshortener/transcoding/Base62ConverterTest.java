@@ -9,33 +9,18 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class Base62ConverterTest {
 
-    @Test
-    void testEncodeDecode() {
-        long originalId = 21;
-
-        String encoded = Base62Converter.encode(originalId);
-        long decoded = Base62Converter.decode(encoded);
-
-        assertThat(decoded).isEqualTo(originalId);
-    }
-
     @ParameterizedTest
     @CsvSource({"1, 1",
             "62, 10",
             "123, 1z"})
-    void testEncoding(long id, String expectedBase62) {
-        String result = Base62Converter.encode(id);
+    void testEncodeDecode(long originalId, String expectedBase62) {
+        String encoded = Base62Converter.encode(originalId);
 
-        assertThat(result).isEqualTo(expectedBase62);
-    }
+        assertThat(encoded).isEqualTo(expectedBase62);
 
-    @Test
-    void testDecoding() {
-        String base62 = "1";
+        long decoded = Base62Converter.decode(encoded);
 
-        long result = Base62Converter.decode(base62);
-
-        assertThat(result).isEqualTo(1);
+        assertThat(decoded).isEqualTo(originalId);
     }
 
     @Test
