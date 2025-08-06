@@ -85,7 +85,7 @@ class ShortenedUrlServiceTest {
 
         assertThat(stats.code()).isEqualTo("kVOkZ");
         assertThat(stats.originalUrl()).isEqualTo(originalUrl);
-        assertThat(stats.clickCounter()).isEqualTo(0);
+        assertThat(stats.clickCounter()).isZero();
         assertThat(stats.createdAt()).isNotNull();
         assertThat(stats.lastClickedAt()).isNull();
     }
