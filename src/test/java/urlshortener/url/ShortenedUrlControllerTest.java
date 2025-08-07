@@ -1,5 +1,6 @@
 package urlshortener.url;
 
+import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -25,7 +26,7 @@ class ShortenedUrlControllerTest {
     private ShortenedUrlService shortenedUrlService;
 
     @Test
-    void shouldShortenUrl() {
+    void testShortenUrl() {
         String originalUrl = "https://example.com";
         String expectedCode = "abcd";
         when(shortenedUrlService.shortenUrl(originalUrl)).thenReturn(expectedCode);
@@ -42,7 +43,7 @@ class ShortenedUrlControllerTest {
     }
 
     @Test
-    void shouldRejectInvalidUrl() {
+    void testShortenInvalidUrl() {
         assertThat(mockMvcTester.post().uri("/shorten")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -65,6 +66,26 @@ class ShortenedUrlControllerTest {
         assertThat(mockMvcTester.get().uri("/{code}", code))
                 .hasStatus(HttpStatus.FOUND)
                 .hasHeader("Location", originalUrl);
+    }
+
+    @Test
+    void testRedirectNonExistentCode() {
+        when(shortenedUrlService.getOriginalUrl("12345")).thenThrow(EntityNotFoundException.class);
+
+        assertThat(mockMvcTester.get().uri("/12345"))
+                .hasStatus(HttpStatus.NOT_FOUND)
+                .bodyText()
+                .isEqualTo("Short URL not found");
+    }
+
+    @Test
+    void testRedirectCodeTooLong() {
+        when(shortenedUrlService.getOriginalUrl("thiscodeistoolong")).thenThrow(IllegalArgumentException.class);
+
+        assertThat(mockMvcTester.get().uri("/thiscodeistoolong"))
+                .hasStatus(HttpStatus.NOT_FOUND)
+                .bodyText()
+                .isEqualTo("Short URL not found");
     }
 
     @Test
