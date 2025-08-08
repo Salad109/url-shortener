@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import urlshortener.dto.ShortenedUrlStats;
 import urlshortener.exception.UrlDeserializationException;
 import urlshortener.exception.UrlSerializationException;
 
@@ -49,6 +50,25 @@ public class ShortenedUrlService {
             redisTemplate.opsForValue().set(code, jsonData, Duration.ofMinutes(5));
 
             return shortenedUrlData.originalUrl();
+        } catch (JsonProcessingException e) {
+            throw new UrlDeserializationException(e);
+        }
+    }
+
+    public ShortenedUrlStats getStats(String code) {
+        String jsonData = redisTemplate.opsForValue().get(code);
+        if (jsonData == null) {
+            throw new IllegalArgumentException("Short URL not found");
+        }
+
+        try {
+            ShortenedUrlData shortenedUrlData = objectMapper.readValue(jsonData, ShortenedUrlData.class);
+
+            return new ShortenedUrlStats(code,
+                    shortenedUrlData.originalUrl(),
+                    shortenedUrlData.clickCounter(),
+                    shortenedUrlData.createdAt(),
+                    shortenedUrlData.lastClickedAt());
         } catch (JsonProcessingException e) {
             throw new UrlDeserializationException(e);
         }

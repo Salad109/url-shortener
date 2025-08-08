@@ -6,6 +6,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.view.RedirectView;
 import urlshortener.dto.ShortenRequest;
+import urlshortener.dto.ShortenedUrlStats;
 import urlshortener.validation.ValidCode;
 
 @Validated
@@ -28,5 +29,10 @@ public class ShortenedUrlController {
     public RedirectView redirect(@PathVariable @ValidCode String code) {
         String originalUrl = shortenedUrlService.getOriginalUrl(code);
         return new RedirectView(originalUrl);
+    }
+
+    @GetMapping("/stats/{code}")
+    public ShortenedUrlStats getStats(@PathVariable @ValidCode String code) {
+        return shortenedUrlService.getStats(code);
     }
 }
