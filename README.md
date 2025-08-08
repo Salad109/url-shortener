@@ -31,15 +31,16 @@ docker-compose up --build
 ```
 
 - App: `http://localhost:8080`
+- Prometheus: `http://localhost:9090`
 - Grafana: `http://localhost:3000` (admin/admin)
 
 ## The ID scrambling
 
-Instead of using randomized strings, which is inefficient, or exposing sequential database IDs (1, 2, 3...), the app
+Instead of using randomized strings, which is inefficient, or directly exposing sequential database IDs (1, 2, 3...), the app
 scrambles them using reversible modulo arithmetic:
 
 ```
-Auto-generated database ID: 1 
+Auto-generated ID: 1 
 (scramble with large number operations)
 687194767
 (convert to base62)
@@ -47,7 +48,7 @@ kVOkZ
 ```
 
 This prevents people from guessing other URLs by incrementing the code. The scrambling is reversible, so `kVOkZ` always
-maps back to database ID 1.
+maps back to ID 1.
 
 ## API
 
@@ -81,7 +82,7 @@ See `test.http` for example requests you can run directly.
 ## Tech Stack
 
 - Java 21 + Spring Boot
-- SQLite
+- Redis
 - Prometheus + Grafana
 - Docker Compose
 - JUnit 5 + AssertJ + Mockito
