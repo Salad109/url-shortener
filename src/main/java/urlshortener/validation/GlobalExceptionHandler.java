@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import urlshortener.exception.UrlSerializationException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -48,5 +49,11 @@ public class GlobalExceptionHandler {
     public ResponseEntity<String> handleEntityNotFound(Exception ex) {
         log.error("Entity not found exception: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Short URL not found");
+    }
+
+    @ExceptionHandler(UrlSerializationException.class)
+    public ResponseEntity<String> handleUrlSerializationException(UrlSerializationException ex) {
+        log.error("URL serialization error: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error serializing URL data");
     }
 }

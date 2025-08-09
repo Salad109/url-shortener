@@ -24,7 +24,7 @@ class Base62ConverterTest {
     }
 
     @Test
-    void shouldThrowExceptionForInvalidCharacter() {
+    void testInvalidCharacterException() {
         assertThatThrownBy(() -> Base62Converter.decode("abc$"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Invalid character in Base62 string: $");

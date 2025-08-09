@@ -7,7 +7,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import urlshortener.dto.ShortenedUrlStats;
-import urlshortener.exception.UrlDeserializationException;
 import urlshortener.exception.UrlSerializationException;
 
 import java.time.Duration;
@@ -15,10 +14,10 @@ import java.time.Duration;
 @Service
 public class ShortenedUrlService {
 
+    private static final Logger log = LoggerFactory.getLogger(ShortenedUrlService.class);
     private final StringRedisTemplate redisTemplate;
     private final IdGenerator idGenerator;
     private final ObjectMapper objectMapper;
-    private static final Logger log = LoggerFactory.getLogger(ShortenedUrlService.class);
 
     public ShortenedUrlService(StringRedisTemplate redisTemplate, IdGenerator idGenerator, ObjectMapper objectMapper) {
         this.redisTemplate = redisTemplate;
@@ -38,7 +37,6 @@ public class ShortenedUrlService {
         } catch (JsonProcessingException e) {
             throw new UrlSerializationException(e);
         }
-
         return code;
     }
 
@@ -55,10 +53,9 @@ public class ShortenedUrlService {
             jsonData = objectMapper.writeValueAsString(shortenedUrlData);
             redisTemplate.opsForValue().set(code, jsonData, Duration.ofMinutes(5));
             log.debug("Retrieved original URL: {} for code: {}", shortenedUrlData.originalUrl(), code);
-
             return shortenedUrlData.originalUrl();
         } catch (JsonProcessingException e) {
-            throw new UrlDeserializationException(e);
+            throw new UrlSerializationException(e);
         }
     }
 
@@ -79,7 +76,7 @@ public class ShortenedUrlService {
                     shortenedUrlData.createdAt(),
                     shortenedUrlData.lastClickedAt());
         } catch (JsonProcessingException e) {
-            throw new UrlDeserializationException(e);
+            throw new UrlSerializationException(e);
         }
     }
 }

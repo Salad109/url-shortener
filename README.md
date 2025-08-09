@@ -36,8 +36,8 @@ docker-compose up --build
 
 ## The ID scrambling
 
-Instead of using randomized strings, which is inefficient, or directly exposing sequential database IDs (1, 2, 3...), the app
-scrambles them using reversible modulo arithmetic:
+Instead of using randomized strings, which is inefficient, or directly exposing sequential database IDs (1, 2, 3...),
+the app scrambles them using reversible modulo arithmetic:
 
 ```
 Auto-generated ID: 1 
