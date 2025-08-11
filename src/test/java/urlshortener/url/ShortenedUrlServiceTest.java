@@ -49,18 +49,17 @@ class ShortenedUrlServiceTest {
         String originalUrl = "http://example.com";
         Instant now = Instant.now();
 
-        // Create protobuf data
-        ShortenedUrl.ShortenedUrlData protoData = ShortenedUrl.ShortenedUrlData.newBuilder()
+        ShortenedUrl.ShortenedUrlData data = ShortenedUrl.ShortenedUrlData.newBuilder()
                 .setOriginalUrl(originalUrl)
                 .setClickCounter(5)
                 .setCreatedAt(now.toEpochMilli())
                 .setLastClickedAt(now.minusSeconds(100).toEpochMilli())
                 .build();
 
-        byte[] protoBytes = protoData.toByteArray();
+        byte[] dataBytes = data.toByteArray();
 
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.get(code)).thenReturn(protoBytes);
+        when(valueOperations.get(code)).thenReturn(dataBytes);
 
         String resultUrl = shortenedUrlService.getOriginalUrl(code);
 
@@ -84,20 +83,19 @@ class ShortenedUrlServiceTest {
         String originalUrl = "http://example.com";
         Instant createdAt = Instant.now().minusSeconds(10);
         Instant lastClickedAt = Instant.now();
-        long clickCounter = 42;
+        long clickCounter = 21;
 
-        // Create protobuf data
-        ShortenedUrl.ShortenedUrlData protoData = ShortenedUrl.ShortenedUrlData.newBuilder()
+        ShortenedUrl.ShortenedUrlData data = ShortenedUrl.ShortenedUrlData.newBuilder()
                 .setOriginalUrl(originalUrl)
                 .setClickCounter(clickCounter)
                 .setCreatedAt(createdAt.toEpochMilli())
                 .setLastClickedAt(lastClickedAt.toEpochMilli())
                 .build();
 
-        byte[] protoBytes = protoData.toByteArray();
+        byte[] dataBytes = data.toByteArray();
 
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.get(code)).thenReturn(protoBytes);
+        when(valueOperations.get(code)).thenReturn(dataBytes);
 
         ShortenedUrlStats result = shortenedUrlService.getStats(code);
 

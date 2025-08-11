@@ -88,3 +88,6 @@ See `test.http` for example requests you can run directly.
 - Virtual threads enabled - minor reduction to CPU and memory usage under high load
 - Protocol Buffers - replaced JSON with binary serialization. Lowered CPU usage by 15% and reduced
   endpoint latency by 10-25%
+
+![Dashboard screenshot](grafana/dashboard.webp)
+Screenshot of the Grafana dashboard during load testing
