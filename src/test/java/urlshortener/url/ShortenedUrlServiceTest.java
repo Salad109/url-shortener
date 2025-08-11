@@ -1,15 +1,14 @@
 package urlshortener.url;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import urlshortener.dto.ShortenedUrlStats;
+import urlshortener.proto.ShortenedUrl;
 
 import java.time.Instant;
 
@@ -21,17 +20,16 @@ import static org.mockito.Mockito.when;
 class ShortenedUrlServiceTest {
 
     @Mock
-    private StringRedisTemplate redisTemplate;
+    private RedisTemplate<String, byte[]> redisTemplate;
 
     @Mock
-    private ValueOperations<String, String> valueOperations;
+    private ValueOperations<String, byte[]> valueOperations;
 
     @Mock
     private IdGenerator idGenerator;
 
     @InjectMocks
     private ShortenedUrlService shortenedUrlService;
-
 
     @Test
     void testShortenUrl() {
@@ -42,19 +40,27 @@ class ShortenedUrlServiceTest {
 
         String resultCode = shortenedUrlService.shortenUrl(originalUrl);
 
-        assertThat(expectedCode).isEqualTo(resultCode);
+        assertThat(resultCode).isEqualTo(expectedCode);
     }
 
     @Test
-    void testGetOriginalUrl() throws Exception {
+    void testGetOriginalUrl() {
         String code = "12345";
         String originalUrl = "http://example.com";
-        urlshortener.url.ShortenedUrlData shortenedUrlData = new urlshortener.url.ShortenedUrlData(originalUrl);
-        ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
-        String jsonData = objectMapper.writeValueAsString(shortenedUrlData);
+        Instant now = Instant.now();
+
+        // Create protobuf data
+        ShortenedUrl.ShortenedUrlData protoData = ShortenedUrl.ShortenedUrlData.newBuilder()
+                .setOriginalUrl(originalUrl)
+                .setClickCounter(5)
+                .setCreatedAt(now.toEpochMilli())
+                .setLastClickedAt(now.minusSeconds(100).toEpochMilli())
+                .build();
+
+        byte[] protoBytes = protoData.toByteArray();
 
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.get(code)).thenReturn(jsonData);
+        when(valueOperations.get(code)).thenReturn(protoBytes);
 
         String resultUrl = shortenedUrlService.getOriginalUrl(code);
 
@@ -73,21 +79,32 @@ class ShortenedUrlServiceTest {
     }
 
     @Test
-    void testGetStats() throws Exception {
+    void testGetStats() {
         String code = "12345";
-        Instant now = Instant.now();
-        ShortenedUrlData data = new ShortenedUrlData("http://example.com", 10, now, now);
-        ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
+        String originalUrl = "http://example.com";
+        Instant createdAt = Instant.now().minusSeconds(10);
+        Instant lastClickedAt = Instant.now();
+        long clickCounter = 42;
+
+        // Create protobuf data
+        ShortenedUrl.ShortenedUrlData protoData = ShortenedUrl.ShortenedUrlData.newBuilder()
+                .setOriginalUrl(originalUrl)
+                .setClickCounter(clickCounter)
+                .setCreatedAt(createdAt.toEpochMilli())
+                .setLastClickedAt(lastClickedAt.toEpochMilli())
+                .build();
+
+        byte[] protoBytes = protoData.toByteArray();
 
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.get(code)).thenReturn(objectMapper.writeValueAsString(data));
+        when(valueOperations.get(code)).thenReturn(protoBytes);
 
         ShortenedUrlStats result = shortenedUrlService.getStats(code);
 
         assertThat(result.code()).isEqualTo(code);
-        assertThat(result.originalUrl()).isEqualTo(data.originalUrl());
-        assertThat(result.clickCounter()).isEqualTo(data.clickCounter());
-        assertThat(result.createdAt()).isEqualTo(data.createdAt());
-        assertThat(result.lastClickedAt()).isEqualTo(data.lastClickedAt());
+        assertThat(result.originalUrl()).isEqualTo(originalUrl);
+        assertThat(result.clickCounter()).isEqualTo(clickCounter);
+        assertThat(result.createdAt()).isEqualTo(createdAt);
+        assertThat(result.lastClickedAt()).isEqualTo(lastClickedAt);
     }
 }

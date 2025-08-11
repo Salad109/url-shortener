@@ -1,6 +1,6 @@
 # URL Shortener
 
-A simple, lightweight URL shortener built with Spring Boot. Takes long URLs and converts them into short codes with
+A fast URL shortener built with Spring Boot. Takes long URLs and converts them into short codes with
 click tracking and analytics.
 
 ## Features
@@ -14,17 +14,7 @@ becomes
 http://localhost:8080/kVOkZ
 ```
 
-## Getting Started
-
-**Just the URL shortener:**
-
-```bash
-./mvnw spring-boot:run
-```
-
-App available at `http://localhost:8080`
-
-**With monitoring dashboard:**
+## Getting started
 
 ```bash
 docker-compose up --build
@@ -72,17 +62,29 @@ curl http://localhost:8080/kVOkZ
 
 ```bash
 curl http://localhost:8080/stats/kVOkZ
-# Returns: click count, creation time, last click time
+# Returns various stats
 ```
 
-Auto-cleanup service removes unused URLs after 5 minutes since last click or creation for demonstration purposes.
+Auto-cleanup service removes unused URLs after 5-6 minutes since last usage (click or creation) for demonstration
+purposes.
 
 See `test.http` for example requests you can run directly.
 
-## Tech Stack
+## Tech stack
 
 - Java 21 + Spring Boot
 - Redis
+- Protocol Buffers
 - Prometheus + Grafana
 - Docker Compose
 - JUnit 5 + AssertJ + Mockito
+
+## Technical choices and their impact on performance
+
+- Base62 + reversible modulo arithmetic for ID scrambling - provides efficient use of 5-character space while also
+  preventing guessing neighboring URLs
+- Redis - used for O(1) lookups. Comes with free TTL functionality which replaced the manual implementation
+  5-10x speedup on all endpoints compared to SQLite
+- Virtual threads enabled - minor reduction to CPU and memory usage under high load
+- Protocol Buffers - replaced JSON with binary serialization. Lowered CPU usage by 15% and reduced
+  endpoint latency by 10-25%

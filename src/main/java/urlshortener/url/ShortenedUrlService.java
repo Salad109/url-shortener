@@ -1,81 +1,88 @@
 package urlshortener.url;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import urlshortener.dto.ShortenedUrlStats;
 import urlshortener.exception.UrlSerializationException;
+import urlshortener.proto.ShortenedUrl;
 
 import java.time.Duration;
+import java.time.Instant;
 
 @Service
 public class ShortenedUrlService {
 
     private static final Logger log = LoggerFactory.getLogger(ShortenedUrlService.class);
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper().registerModule(new JavaTimeModule());
-    private final StringRedisTemplate redisTemplate;
+    private final RedisTemplate<String, byte[]> redisTemplate;
     private final IdGenerator idGenerator;
 
-    public ShortenedUrlService(StringRedisTemplate redisTemplate, IdGenerator idGenerator) {
+    public ShortenedUrlService(RedisTemplate<String, byte[]> redisTemplate, IdGenerator idGenerator) {
         this.redisTemplate = redisTemplate;
         this.idGenerator = idGenerator;
     }
 
     public String shortenUrl(String originalUrl) {
         String code = idGenerator.generateCode();
-        ShortenedUrlData shortenedUrlData = new ShortenedUrlData(originalUrl);
 
-        try {
-            log.info("Shortening URL: {} with code: {}", originalUrl, code);
-            String jsonData = OBJECT_MAPPER.writeValueAsString(shortenedUrlData);
-            redisTemplate.opsForValue().set(code, jsonData, Duration.ofMinutes(5));
-            log.debug("Shortened URL: {} to code: {}", originalUrl, code);
-        } catch (JsonProcessingException e) {
-            throw new UrlSerializationException(e);
-        }
+        ShortenedUrl.ShortenedUrlData data = ShortenedUrl.ShortenedUrlData.newBuilder()
+                .setOriginalUrl(originalUrl)
+                .setClickCounter(0)
+                .setCreatedAt(Instant.now().toEpochMilli())
+                .setLastClickedAt(0)
+                .build();
+
+        log.info("Shortening URL: {} with code: {}", originalUrl, code);
+        redisTemplate.opsForValue().set(code, data.toByteArray(), Duration.ofMinutes(5));
+        log.debug("Shortened URL: {} to code: {}", originalUrl, code);
         return code;
     }
 
     public String getOriginalUrl(String code) {
         log.debug("Retrieving original URL for code: {}", code);
-        String jsonData = redisTemplate.opsForValue().get(code);
-        if (jsonData == null) {
+        byte[] bytes = redisTemplate.opsForValue().get(code);
+        if (bytes == null) {
             throw new IllegalArgumentException("Short URL not found");
         }
 
         try {
-            ShortenedUrlData shortenedUrlData = OBJECT_MAPPER.readValue(jsonData, ShortenedUrlData.class);
-            shortenedUrlData = shortenedUrlData.incrementClicks();
-            jsonData = OBJECT_MAPPER.writeValueAsString(shortenedUrlData);
-            redisTemplate.opsForValue().set(code, jsonData, Duration.ofMinutes(5));
-            log.debug("Retrieved original URL: {} for code: {}", shortenedUrlData.originalUrl(), code);
-            return shortenedUrlData.originalUrl();
-        } catch (JsonProcessingException e) {
+            ShortenedUrl.ShortenedUrlData data = ShortenedUrl.ShortenedUrlData.parseFrom(bytes);
+
+            ShortenedUrl.ShortenedUrlData updated = data.toBuilder()
+                    .setClickCounter(data.getClickCounter() + 1)
+                    .setLastClickedAt(Instant.now().toEpochMilli())
+                    .build();
+
+            redisTemplate.opsForValue().set(code, updated.toByteArray(), Duration.ofMinutes(5));
+
+            log.debug("Retrieved original URL: {} for code: {}", data.getOriginalUrl(), code);
+            return data.getOriginalUrl();
+        } catch (Exception e) {
             throw new UrlSerializationException(e);
         }
     }
 
     public ShortenedUrlStats getStats(String code) {
         log.debug("Retrieving stats for code: {}", code);
-        String jsonData = redisTemplate.opsForValue().get(code);
-        if (jsonData == null) {
+        byte[] bytes = redisTemplate.opsForValue().get(code);
+        if (bytes == null) {
             throw new IllegalArgumentException("Short URL not found");
         }
 
         try {
-            ShortenedUrlData shortenedUrlData = OBJECT_MAPPER.readValue(jsonData, ShortenedUrlData.class);
+            ShortenedUrl.ShortenedUrlData data = ShortenedUrl.ShortenedUrlData.parseFrom(bytes);
             log.debug("Retrieved stats for code: {}", code);
 
+            Instant createdAt = Instant.ofEpochMilli(data.getCreatedAt());
+            Instant lastClickedAt = data.getLastClickedAt() == 0 ? null : Instant.ofEpochMilli(data.getLastClickedAt());
+
             return new ShortenedUrlStats(code,
-                    shortenedUrlData.originalUrl(),
-                    shortenedUrlData.clickCounter(),
-                    shortenedUrlData.createdAt(),
-                    shortenedUrlData.lastClickedAt());
-        } catch (JsonProcessingException e) {
+                    data.getOriginalUrl(),
+                    data.getClickCounter(),
+                    createdAt,
+                    lastClickedAt);
+        } catch (Exception e) {
             throw new UrlSerializationException(e);
         }
     }

@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package urlshortener.proto;
+
+message ShortenedUrlData {
+  string original_url = 1;
+  int64 click_counter = 2;
+  int64 created_at = 3;
+  int64 last_clicked_at = 4;
+}
