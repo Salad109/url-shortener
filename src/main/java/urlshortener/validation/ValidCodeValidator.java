@@ -3,9 +3,12 @@ package urlshortener.validation;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 
+import java.util.regex.Pattern;
+
 public class ValidCodeValidator implements ConstraintValidator<ValidCode, String> {
 
     private static final int MAX_CODE_LENGTH = 5;
+    private static final Pattern PATTERN = Pattern.compile("^[a-zA-Z0-9]+$");
 
     @Override
     public boolean isValid(String code, ConstraintValidatorContext context) {
@@ -17,6 +20,6 @@ public class ValidCodeValidator implements ConstraintValidator<ValidCode, String
             return false;
         }
 
-        return code.matches("^[a-zA-Z0-9]+$");
+        return PATTERN.matcher(code).matches();
     }
 }

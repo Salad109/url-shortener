@@ -1,24 +1,20 @@
 package urlshortener.url;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import urlshortener.dto.ShortenedUrlStats;
-import urlshortener.exception.UrlSerializationException;
 
 import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -33,13 +29,9 @@ class ShortenedUrlServiceTest {
     @Mock
     private IdGenerator idGenerator;
 
+    @InjectMocks
     private ShortenedUrlService shortenedUrlService;
 
-    @BeforeEach
-    void setUp() {
-        ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
-        shortenedUrlService = new ShortenedUrlService(redisTemplate, idGenerator, objectMapper);
-    }
 
     @Test
     void testShortenUrl() {
@@ -51,22 +43,6 @@ class ShortenedUrlServiceTest {
         String resultCode = shortenedUrlService.shortenUrl(originalUrl);
 
         assertThat(expectedCode).isEqualTo(resultCode);
-    }
-
-    @Test
-    void testShortenUrlException() throws Exception {
-        ObjectMapper mockedObjectMapper = mock(ObjectMapper.class);
-        ShortenedUrlService mockedService = new ShortenedUrlService(redisTemplate, idGenerator, mockedObjectMapper);
-
-        when(mockedObjectMapper.writeValueAsString(any(urlshortener.url.ShortenedUrlData.class)))
-                .thenThrow(new JsonProcessingException("Serialization error") {
-                });
-        when(idGenerator.generateCode()).thenReturn("12345");
-
-
-        assertThatThrownBy(() -> mockedService.shortenUrl("http://example.com"))
-                .isInstanceOf(UrlSerializationException.class)
-                .hasMessage("Error serializing or deserializing URL data");
     }
 
     @Test

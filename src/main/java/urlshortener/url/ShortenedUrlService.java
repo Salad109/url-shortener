@@ -2,6 +2,7 @@ package urlshortener.url;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -15,14 +16,13 @@ import java.time.Duration;
 public class ShortenedUrlService {
 
     private static final Logger log = LoggerFactory.getLogger(ShortenedUrlService.class);
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper().registerModule(new JavaTimeModule());
     private final StringRedisTemplate redisTemplate;
     private final IdGenerator idGenerator;
-    private final ObjectMapper objectMapper;
 
-    public ShortenedUrlService(StringRedisTemplate redisTemplate, IdGenerator idGenerator, ObjectMapper objectMapper) {
+    public ShortenedUrlService(StringRedisTemplate redisTemplate, IdGenerator idGenerator) {
         this.redisTemplate = redisTemplate;
         this.idGenerator = idGenerator;
-        this.objectMapper = objectMapper;
     }
 
     public String shortenUrl(String originalUrl) {
@@ -31,7 +31,7 @@ public class ShortenedUrlService {
 
         try {
             log.info("Shortening URL: {} with code: {}", originalUrl, code);
-            String jsonData = objectMapper.writeValueAsString(shortenedUrlData);
+            String jsonData = OBJECT_MAPPER.writeValueAsString(shortenedUrlData);
             redisTemplate.opsForValue().set(code, jsonData, Duration.ofMinutes(5));
             log.debug("Shortened URL: {} to code: {}", originalUrl, code);
         } catch (JsonProcessingException e) {
@@ -48,9 +48,9 @@ public class ShortenedUrlService {
         }
 
         try {
-            ShortenedUrlData shortenedUrlData = objectMapper.readValue(jsonData, ShortenedUrlData.class);
+            ShortenedUrlData shortenedUrlData = OBJECT_MAPPER.readValue(jsonData, ShortenedUrlData.class);
             shortenedUrlData = shortenedUrlData.incrementClicks();
-            jsonData = objectMapper.writeValueAsString(shortenedUrlData);
+            jsonData = OBJECT_MAPPER.writeValueAsString(shortenedUrlData);
             redisTemplate.opsForValue().set(code, jsonData, Duration.ofMinutes(5));
             log.debug("Retrieved original URL: {} for code: {}", shortenedUrlData.originalUrl(), code);
             return shortenedUrlData.originalUrl();
@@ -67,7 +67,7 @@ public class ShortenedUrlService {
         }
 
         try {
-            ShortenedUrlData shortenedUrlData = objectMapper.readValue(jsonData, ShortenedUrlData.class);
+            ShortenedUrlData shortenedUrlData = OBJECT_MAPPER.readValue(jsonData, ShortenedUrlData.class);
             log.debug("Retrieved stats for code: {}", code);
 
             return new ShortenedUrlStats(code,
