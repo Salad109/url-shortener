@@ -15,7 +15,10 @@ public class IdGenerator {
     }
 
     public String generateCode() {
-        Long id = redisTemplate.opsForValue().increment("url_counter");
+        Long id = redisTemplate.opsForValue().increment("internal:url_id_counter");
+        if (id == null) {
+            throw new IllegalStateException("ID increment failed");
+        }
         long scrambledId = IdScrambler.encode(id);
         return Base62Converter.encode(scrambledId);
     }
