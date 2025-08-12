@@ -17,10 +17,12 @@ public class ShortenedUrlService {
     private static final Logger log = LoggerFactory.getLogger(ShortenedUrlService.class);
     private final RedisTemplate<String, byte[]> redisTemplate;
     private final IdGenerator idGenerator;
+    private final ShortenedUrlUpdater shortenedUrlUpdater;
 
-    public ShortenedUrlService(RedisTemplate<String, byte[]> redisTemplate, IdGenerator idGenerator) {
+    public ShortenedUrlService(RedisTemplate<String, byte[]> redisTemplate, IdGenerator idGenerator, ShortenedUrlUpdater shortenedUrlUpdater) {
         this.redisTemplate = redisTemplate;
         this.idGenerator = idGenerator;
+        this.shortenedUrlUpdater = shortenedUrlUpdater;
     }
 
     public String shortenUrl(String originalUrl) {
@@ -40,7 +42,6 @@ public class ShortenedUrlService {
     }
 
     public String getOriginalUrl(String code) {
-        log.debug("Retrieving original URL for code: {}", code);
         byte[] bytes = redisTemplate.opsForValue().get(code);
         if (bytes == null) {
             throw new IllegalArgumentException("Short URL not found");
@@ -49,12 +50,7 @@ public class ShortenedUrlService {
         try {
             ShortenedUrl.ShortenedUrlData data = ShortenedUrl.ShortenedUrlData.parseFrom(bytes);
 
-            ShortenedUrl.ShortenedUrlData updated = data.toBuilder()
-                    .setClickCounter(data.getClickCounter() + 1)
-                    .setLastClickedAt(Instant.now().toEpochMilli())
-                    .build();
-
-            redisTemplate.opsForValue().set(code, updated.toByteArray(), Duration.ofMinutes(5));
+            shortenedUrlUpdater.updateUrlStats(code, data);
 
             log.debug("Retrieved original URL: {} for code: {}", data.getOriginalUrl(), code);
             return data.getOriginalUrl();
@@ -62,6 +58,7 @@ public class ShortenedUrlService {
             throw new UrlSerializationException(e);
         }
     }
+
 
     public ShortenedUrlStats getStats(String code) {
         log.debug("Retrieving stats for code: {}", code);

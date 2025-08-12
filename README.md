@@ -1,6 +1,7 @@
 # URL Shortener
 
-A fast URL shortener built with Spring Boot. Takes long URLs and converts them into short codes with
+A URL shortener built with a focus on performance using Spring Boot. Takes long URLs and converts them into short codes
+with
 click tracking and analytics.
 
 ## Features
@@ -26,8 +27,8 @@ docker-compose up --build
 
 ## The ID scrambling
 
-Instead of using randomized strings, which is inefficient, or directly exposing sequential database IDs (1, 2, 3...),
-the app scrambles them using reversible modulo arithmetic:
+Instead of using randomized strings, which is a wasteful use of the 5-character space, or directly exposing sequential
+database IDs (1, 2, 3...), the app scrambles them using reversible modulo arithmetic:
 
 ```
 Auto-generated ID: 1 
@@ -42,7 +43,7 @@ maps back to ID 1.
 
 ## API
 
-**Create short URL:**
+Shorten URL:
 
 ```bash
 curl -X POST http://localhost:8080/shorten \
@@ -51,14 +52,14 @@ curl -X POST http://localhost:8080/shorten \
 # Returns: kVOkZ
 ```
 
-**Use short URL:**
+Use short URL:
 
 ```bash
 curl http://localhost:8080/kVOkZ
 # Redirects to https://example.com
 ```
 
-**Check stats:**
+Check stats:
 
 ```bash
 curl http://localhost:8080/stats/kVOkZ
@@ -81,13 +82,14 @@ See `test.http` for example requests you can run directly.
 
 ## Technical choices and their impact on performance
 
-- Base62 + reversible modulo arithmetic for ID scrambling - provides efficient use of 5-character space while also
-  preventing guessing neighboring URLs
-- Redis - used for O(1) lookups. Comes with free TTL functionality which replaced the manual implementation
+- Redis - used for O(1) lookups. Comes with free TTL functionality which replaced the manual implementation.
   5-10x speedup on all endpoints compared to SQLite
-- Virtual threads enabled - minor reduction to CPU and memory usage under high load
 - Protocol Buffers - replaced JSON with binary serialization. Lowered CPU usage by 15% and reduced
   endpoint latency by 10-25%
+- Asynchronous stats updates - stats are updated asynchronously from the main redirection flow, speeding up the redirect
+  endpoint by 60-70%
+- And many more small optimizations, like enabling virtual threads, replacing regexes with direct comparisons, etc. -
+  10-20% reduction in CPU usage and endpoint latency
 
 ![Dashboard screenshot](grafana/dashboard.webp)
 Screenshot of the Grafana dashboard during load testing
