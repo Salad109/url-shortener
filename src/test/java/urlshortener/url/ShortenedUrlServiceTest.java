@@ -28,6 +28,9 @@ class ShortenedUrlServiceTest {
     @Mock
     private IdGenerator idGenerator;
 
+    @Mock
+    private ShortenedUrlUpdater shortenedUrlUpdater;
+
     @InjectMocks
     private ShortenedUrlService shortenedUrlService;
 
@@ -81,15 +84,15 @@ class ShortenedUrlServiceTest {
     void testGetStats() {
         String code = "12345";
         String originalUrl = "http://example.com";
-        Instant createdAt = Instant.now().minusSeconds(10);
-        Instant lastClickedAt = Instant.now();
+        long createdAt = Instant.now().minusSeconds(10).toEpochMilli();
+        long lastClickedAt = Instant.now().toEpochMilli();
         long clickCounter = 21;
 
         ShortenedUrl.ShortenedUrlData data = ShortenedUrl.ShortenedUrlData.newBuilder()
                 .setOriginalUrl(originalUrl)
                 .setClickCounter(clickCounter)
-                .setCreatedAt(createdAt.toEpochMilli())
-                .setLastClickedAt(lastClickedAt.toEpochMilli())
+                .setCreatedAt(createdAt)
+                .setLastClickedAt(lastClickedAt)
                 .build();
 
         byte[] dataBytes = data.toByteArray();
@@ -102,7 +105,7 @@ class ShortenedUrlServiceTest {
         assertThat(result.code()).isEqualTo(code);
         assertThat(result.originalUrl()).isEqualTo(originalUrl);
         assertThat(result.clickCounter()).isEqualTo(clickCounter);
-        assertThat(result.createdAt()).isEqualTo(createdAt);
-        assertThat(result.lastClickedAt()).isEqualTo(lastClickedAt);
+        assertThat(result.createdAt().toEpochMilli()).isEqualTo(createdAt);
+        assertThat(result.lastClickedAt().toEpochMilli()).isEqualTo(lastClickedAt);
     }
 }
