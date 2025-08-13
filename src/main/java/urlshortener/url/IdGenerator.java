@@ -1,6 +1,6 @@
 package urlshortener.url;
 
-import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 import urlshortener.transcoding.Base62Converter;
 import urlshortener.transcoding.IdScrambler;
@@ -8,9 +8,9 @@ import urlshortener.transcoding.IdScrambler;
 @Component
 public class IdGenerator {
 
-    private final StringRedisTemplate redisTemplate;
+    private final RedisTemplate<String, byte[]> redisTemplate;
 
-    public IdGenerator(StringRedisTemplate redisTemplate) {
+    public IdGenerator(RedisTemplate<String, byte[]> redisTemplate) {
         this.redisTemplate = redisTemplate;
     }
 

@@ -21,16 +21,12 @@ public class ShortenedUrlUpdater {
 
     @Async
     public void updateUrlStats(String code, urlshortener.proto.ShortenedUrl.ShortenedUrlData data) {
-        try {
-            urlshortener.proto.ShortenedUrl.ShortenedUrlData updated = data.toBuilder()
-                    .setClickCounter(data.getClickCounter() + 1)
-                    .setLastClickedAt(Instant.now().toEpochMilli())
-                    .build();
+        urlshortener.proto.ShortenedUrl.ShortenedUrlData updated = data.toBuilder()
+                .setClickCounter(data.getClickCounter() + 1)
+                .setLastClickedAt(Instant.now().toEpochMilli())
+                .build();
 
-            redisTemplate.opsForValue().set(code, updated.toByteArray(), Duration.ofMinutes(5));
-            log.debug("Updated click stats for code: {}", code);
-        } catch (Exception e) {
-            log.warn("Failed to update click stats for code: {}", code, e);
-        }
+        redisTemplate.opsForValue().set(code, updated.toByteArray(), Duration.ofMinutes(5));
+        log.debug("Updated click stats for code: {}", code);
     }
 }
