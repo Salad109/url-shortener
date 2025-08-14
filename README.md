@@ -84,12 +84,27 @@ See `test.http` for example requests you can run directly.
 
 - Redis - used for O(1) lookups. Comes with free TTL functionality which replaced the manual implementation.
   5-10x speedup on all endpoints compared to SQLite
-- Protocol Buffers - replaced JSON with binary serialization. Lowered CPU usage by 15% and reduced
+- Protocol buffers - replaced JSON with binary serialization. Lowered CPU usage by 15% and reduced
   endpoint latency by 10-25%
 - Asynchronous stats updates - stats are updated asynchronously from the main redirection flow, speeding up the redirect
   endpoint by 60-70%
-- And many more small optimizations, like enabling virtual threads, replacing regexes with direct comparisons, etc. -
+- And many more small optimizations, like enabling virtual threads, ~~pre-compiling regexes~~ replacing regexes with
+  direct comparisons, etc. -
   10-20% reduction in CPU usage and endpoint latency
+
+### Why protocol buffers
+
+| Data format      | Redirect endpoint latency @10kRPS load | Notes                                                               |
+|------------------|----------------------------------------|---------------------------------------------------------------------|
+| JSON             | 2.2-2.4ms                              | Simple implementation, but inefficient use of CPU and memory        |
+| Protocol buffers | 1.9-2.0ms                              | Much more efficient use of system resources, but more complex setup |
+| Raw KV pairs     | 1.6ms                                  | Fastest, but keeping track of all keys was becoming too complicated |
+| Redis hashes     | 4.2ms                                  | Easier to manage than raw KV pairs, but way too slow                |
+
+I chose Protocol buffers because despite the setup complexity, the code is still simple and readable, while still being
+much more efficient than JSON. Keeping track of all KV pairs and their TTLs manually was becoming too complicated, so I
+decided not to use them even though the performance would benefit. I tried using hashes, but they turned out to be the
+slowest in testing.
 
 ![Dashboard screenshot](grafana/dashboard.webp)
 Screenshot of the Grafana dashboard during load testing
