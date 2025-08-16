@@ -40,6 +40,20 @@ class ShortenedUrlControllerTest {
     }
 
     @Test
+    void testShortenInvalidUrl() {
+        assertThat(mvc.post()
+                .uri("/shorten")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"originalUrl": "invalid-url"}
+                        """))
+                .hasStatus(HttpStatus.BAD_REQUEST)
+                .bodyJson()
+                .extractingPath("originalUrl")
+                .isEqualTo("URL must start with http:// or https:// and be less than 2048 characters");
+    }
+
+    @Test
     void testRedirect() {
         String originalUrl = "https://example.com";
         String code = "kVOkZ";
@@ -50,6 +64,30 @@ class ShortenedUrlControllerTest {
                 .accept(MediaType.TEXT_PLAIN))
                 .hasStatus(HttpStatus.FOUND)
                 .hasHeader("Location", originalUrl);
+    }
+
+    @Test
+    void testRedirectNotFound() {
+        String code = "12345";
+        when(shortenedUrlService.getOriginalUrl(code)).thenThrow(new IllegalArgumentException("Short URL not found"));
+
+        assertThat(mvc.get()
+                .uri("/{code}", code)
+                .accept(MediaType.TEXT_PLAIN))
+                .hasStatus(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void testRedirectInvalidCode() {
+        String invalidCode = "this-is-not-a-code";
+
+        assertThat(mvc.get()
+                .uri("/{code}", invalidCode)
+                .accept(MediaType.APPLICATION_JSON))
+                .hasStatus(HttpStatus.BAD_REQUEST)
+                .bodyJson()
+                .extractingPath("code")
+                .isEqualTo("Code must be alphanumeric and up to 5 characters long");
     }
 
     @Test
