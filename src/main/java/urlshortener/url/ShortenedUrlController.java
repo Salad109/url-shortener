@@ -36,7 +36,7 @@ public class ShortenedUrlController {
     @Operation(summary = "Shorten a URL",
             description = "Takes a long URL and returns a short code related to it")
     @ApiResponse(responseCode = "201", description = "Short code created successfully")
-    @ApiResponse(responseCode = "400", description = "Invalid URL provided",
+    @ApiResponse(responseCode = "422", description = "Invalid URL provided",
             content = @Content(examples = @ExampleObject(value = "{\"originalUrl\": \"Invalid URL\"}")))
     @PostMapping("/shorten")
     @ResponseStatus(HttpStatus.CREATED)
@@ -48,6 +48,8 @@ public class ShortenedUrlController {
     @ApiResponse(responseCode = "302", description = "Redirected to original URL")
     @ApiResponse(responseCode = "404", description = "Short code not found",
             content = @Content(examples = @ExampleObject(value = "{\"error\": \"Short URL not found\"}")))
+    @ApiResponse(responseCode = "422", description = "Invalid code format",
+            content = @Content(examples = @ExampleObject(value = "{\"code\": \"Invalid code format\"}")))
     @GetMapping("/{code}")
     public RedirectView redirect(@PathVariable @ValidCode String code) {
         String originalUrl = shortenedUrlService.getOriginalUrl(code);
@@ -58,6 +60,8 @@ public class ShortenedUrlController {
     @ApiResponse(responseCode = "200", description = "Stats retrieved successfully")
     @ApiResponse(responseCode = "404", description = "Short code not found",
             content = @Content(examples = @ExampleObject(value = "{\"error\": \"Short URL not found\"}")))
+    @ApiResponse(responseCode = "422", description = "Invalid code format",
+            content = @Content(examples = @ExampleObject(value = "{\"code\": \"Invalid code format\"}")))
     @GetMapping("/stats/{code}")
     public ShortenedUrlStats getStats(@PathVariable @ValidCode String code) {
         return shortenedUrlService.getStats(code);

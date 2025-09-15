@@ -54,8 +54,8 @@
         if (!url) return show('Enter a URL', true);
 
         try {
-            const code = await api('/shorten', {originalUrl: url});
-            const short = `${location.origin}/${code}`;
+            const response = await api('/shorten', {originalUrl: url});
+            const short = `${location.origin}/${response.shortCode}`;
             show(`<strong>Short URL:</strong> <a href="${short}" target="_blank">${short}</a>`);
         } catch (e) {
             show(e, true);
@@ -69,9 +69,11 @@
         try {
             const data = await api(`/stats/${code}`);
             const last = data.lastClickedAt ? new Date(data.lastClickedAt).toLocaleString() : 'Never';
+            const created = new Date(data.createdAt).toLocaleString();
             show(`<strong>${data.code}:</strong> ${data.originalUrl}<br>
                       <strong>Clicks:</strong> ${data.clickCounter}<br>
-                      <strong>Last:</strong> ${last}`);
+                      <strong>Created at:</strong> ${created}<br>
+                      <strong>Last clicked at:</strong> ${last}`);
         } catch (e) {
             show(e, true);
         }

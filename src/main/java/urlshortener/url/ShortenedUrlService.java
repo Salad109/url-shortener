@@ -27,6 +27,7 @@ public class ShortenedUrlService {
     }
 
     public ShortenResponse shortenUrl(String originalUrl) {
+        log.debug("Received request to shorten URL: {}", originalUrl);
         String code = idGenerator.generateCode();
 
         ShortenedUrl.ShortenedUrlData data = ShortenedUrl.ShortenedUrlData.newBuilder()
@@ -36,13 +37,13 @@ public class ShortenedUrlService {
                 .setLastClickedAt(0)
                 .build();
 
-        log.info("Shortening URL: {} with code: {}", originalUrl, code);
         redisTemplate.opsForValue().set(code, data.toByteArray(), Duration.ofMinutes(5));
-        log.debug("Shortened URL: {} to code: {}", originalUrl, code);
+        log.info("Shortened URL: {} to code: {}", originalUrl, code);
         return new ShortenResponse(code);
     }
 
     public String getOriginalUrl(String code) {
+        log.debug("Retrieving original URL for code: {}", code);
         byte[] bytes = redisTemplate.opsForValue().get(code);
         if (bytes == null) {
             throw new IllegalArgumentException("Short URL not found");
@@ -53,7 +54,7 @@ public class ShortenedUrlService {
 
             shortenedUrlUpdater.updateUrlStats(code, data);
 
-            log.debug("Retrieved original URL: {} for code: {}", data.getOriginalUrl(), code);
+            log.info("Retrieved original URL: {} for code: {}", data.getOriginalUrl(), code);
             return data.getOriginalUrl();
         } catch (Exception e) {
             throw new UrlSerializationException(e);
@@ -70,10 +71,11 @@ public class ShortenedUrlService {
 
         try {
             ShortenedUrl.ShortenedUrlData data = ShortenedUrl.ShortenedUrlData.parseFrom(bytes);
-            log.debug("Retrieved stats for code: {}", code);
 
             Instant createdAt = Instant.ofEpochMilli(data.getCreatedAt());
             Instant lastClickedAt = data.getLastClickedAt() == 0 ? null : Instant.ofEpochMilli(data.getLastClickedAt());
+
+            log.info("Retrieved stats for code: {}", code);
 
             return new ShortenedUrlStats(code,
                     data.getOriginalUrl(),

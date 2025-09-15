@@ -50,7 +50,7 @@ class ShortenedUrlControllerTest {
                 .content("""
                         {"originalUrl": "invalid-url"}
                         """))
-                .hasStatus(HttpStatus.BAD_REQUEST)
+                .hasStatus(HttpStatus.UNPROCESSABLE_ENTITY)
                 .bodyJson()
                 .extractingPath("originalUrl")
                 .isEqualTo("URL must start with http:// or https:// and be less than 2048 characters");
@@ -90,7 +90,7 @@ class ShortenedUrlControllerTest {
         assertThat(mvc.get()
                 .uri("/{code}", invalidCode)
                 .accept(MediaType.APPLICATION_JSON))
-                .hasStatus(HttpStatus.BAD_REQUEST)
+                .hasStatus(HttpStatus.UNPROCESSABLE_ENTITY)
                 .bodyJson()
                 .extractingPath("code")
                 .isEqualTo("Code must be alphanumeric and up to 5 characters long");

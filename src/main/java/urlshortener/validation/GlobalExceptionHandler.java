@@ -26,8 +26,8 @@ public class GlobalExceptionHandler {
             errors.put(error.getField(), error.getDefaultMessage());
         }
 
-        log.error("Validation errors: {}", errors);
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errors);
+        log.info("Validation errors: {}", errors);
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(errors);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
@@ -41,20 +41,20 @@ public class GlobalExceptionHandler {
             errors.put(field, violation.getMessage());
         }
 
-        log.error("Constraint violations: {}", errors);
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errors);
+        log.info("Constraint violations: {}", errors);
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(errors);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, String>> handleEntityNotFound(Exception ex) {
-        log.error("Entity not found exception: {}", ex.getMessage());
+        log.info("Entity not found exception: {}", ex.getMessage());
 
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", ex.getMessage()));
     }
 
     @ExceptionHandler(UrlSerializationException.class)
     public ResponseEntity<Map<String, String>> handleUrlSerializationException(UrlSerializationException ex) {
-        log.error("URL serialization error: {}", ex.getMessage());
+        log.info("URL serialization error: {}", ex.getMessage());
 
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Internal server error"));
     }
