@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>URL Shortener</title>
+    <link href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" rel="stylesheet">
+</head>
+<body>
+<main class="container">
+    <h1>URL Shortener</h1>
+
+    <input id="input" placeholder="Enter URL to shorten or code for stats" type="text">
+
+    <div class="grid">
+        <button onclick="shorten()">Shorten URL</button>
+        <button class="secondary" onclick="stats()">Get Stats</button>
+    </div>
+
+    <div id="result" style="display: none;"></div>
+</main>
+
+<script>
+    const input = document.getElementById('input');
+    const result = document.getElementById('result');
+
+    const show = (msg, err = false) => {
+        result.innerHTML = `<article ${err ? 'style="color:red"' : ''}>${msg}</article>`;
+        result.style.display = 'block';
+    };
+
+    async function api(url, data) {
+        const res = await fetch(url, data && {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            try {
+                const errorJson = JSON.parse(errorText);
+                throw errorJson.originalUrl || errorJson.error || 'Request failed';
+            } catch {
+                throw errorText || 'Request failed';
+            }
+        }
+
+        return res.text().then(t => t[0] === '{' ? JSON.parse(t) : t);
+    }
+
+    async function shorten() {
+        const url = input.value.trim();
+        if (!url) return show('Enter a URL', true);
+
+        try {
+            const code = await api('/shorten', {originalUrl: url});
+            const short = `${location.origin}/${code}`;
+            show(`<strong>Short URL:</strong> <a href="${short}" target="_blank">${short}</a>`);
+        } catch (e) {
+            show(e, true);
+        }
+    }
+
+    async function stats() {
+        const code = input.value.trim();
+        if (!code) return show('Enter a code', true);
+
+        try {
+            const data = await api(`/stats/${code}`);
+            const last = data.lastClickedAt ? new Date(data.lastClickedAt).toLocaleString() : 'Never';
+            show(`<strong>${data.code}:</strong> ${data.originalUrl}<br>
+                      <strong>Clicks:</strong> ${data.clickCounter}<br>
+                      <strong>Last:</strong> ${last}`);
+        } catch (e) {
+            show(e, true);
+        }
+    }
+
+    input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            e.target.value.includes('http') ? shorten() : stats();
+        }
+    });
+</script>
+</body>
+</html>
