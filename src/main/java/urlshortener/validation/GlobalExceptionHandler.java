@@ -46,14 +46,16 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<String> handleEntityNotFound(Exception ex) {
+    public ResponseEntity<Map<String, String>> handleEntityNotFound(Exception ex) {
         log.error("Entity not found exception: {}", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Short URL not found");
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", ex.getMessage()));
     }
 
     @ExceptionHandler(UrlSerializationException.class)
-    public ResponseEntity<String> handleUrlSerializationException(UrlSerializationException ex) {
+    public ResponseEntity<Map<String, String>> handleUrlSerializationException(UrlSerializationException ex) {
         log.error("URL serialization error: {}", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error serializing URL data");
+
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", ex.getMessage()));
     }
 }

@@ -7,6 +7,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import urlshortener.dto.ShortenResponse;
 import urlshortener.dto.ShortenedUrlStats;
 import urlshortener.proto.ShortenedUrl;
 
@@ -41,7 +42,8 @@ class ShortenedUrlServiceTest {
         when(idGenerator.generateCode()).thenReturn(expectedCode);
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 
-        String resultCode = shortenedUrlService.shortenUrl(originalUrl);
+        ShortenResponse result = shortenedUrlService.shortenUrl(originalUrl);
+        String resultCode = result.shortCode();
 
         assertThat(resultCode).isEqualTo(expectedCode);
     }

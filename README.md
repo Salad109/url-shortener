@@ -49,7 +49,7 @@ Shorten URL:
 curl -X POST http://localhost:8080/shorten \
   -H "Content-Type: application/json" \
   -d '{"originalUrl": "https://example.com"}'
-# Returns: kVOkZ
+# Returns: {"shortCode": "kVOkZ"}
 ```
 
 Use short URL:
@@ -66,7 +66,7 @@ curl http://localhost:8080/stats/kVOkZ
 # Returns various stats
 ```
 
-Auto-cleanup service removes unused URLs after 5-6 minutes since last usage (click or creation) for demonstration
+Auto-cleanup service removes unused URLs after 5 minutes since last usage (click or creation) for demonstration
 purposes.
 
 See `test.http` for example requests you can run directly.

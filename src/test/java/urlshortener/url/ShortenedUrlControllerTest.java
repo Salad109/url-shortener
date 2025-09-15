@@ -8,6 +8,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
+import urlshortener.dto.ShortenResponse;
 import urlshortener.dto.ShortenedUrlStats;
 
 import java.time.Instant;
@@ -26,7 +27,7 @@ class ShortenedUrlControllerTest {
 
     @Test
     void testShortenUrl() {
-        String expectedCode = "kVOkZ";
+        ShortenResponse expectedCode = new ShortenResponse("kVOkZ");
         when(shortenedUrlService.shortenUrl("https://example.com")).thenReturn(expectedCode);
 
         assertThat(mvc.post()
@@ -36,7 +37,9 @@ class ShortenedUrlControllerTest {
                         {"originalUrl": "https://example.com"}
                         """))
                 .hasStatus(HttpStatus.CREATED)
-                .hasBodyTextEqualTo(expectedCode);
+                .bodyJson()
+                .extractingPath("shortCode")
+                .isEqualTo("kVOkZ");
     }
 
     @Test
@@ -73,8 +76,11 @@ class ShortenedUrlControllerTest {
 
         assertThat(mvc.get()
                 .uri("/{code}", code)
-                .accept(MediaType.TEXT_PLAIN))
-                .hasStatus(HttpStatus.NOT_FOUND);
+                .accept(MediaType.APPLICATION_JSON))
+                .hasStatus(HttpStatus.NOT_FOUND)
+                .bodyJson()
+                .extractingPath("error")
+                .isEqualTo("Short URL not found");
     }
 
     @Test

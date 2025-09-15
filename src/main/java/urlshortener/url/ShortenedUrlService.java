@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import urlshortener.dto.ShortenResponse;
 import urlshortener.dto.ShortenedUrlStats;
 import urlshortener.exception.UrlSerializationException;
 import urlshortener.proto.ShortenedUrl;
@@ -25,7 +26,7 @@ public class ShortenedUrlService {
         this.shortenedUrlUpdater = shortenedUrlUpdater;
     }
 
-    public String shortenUrl(String originalUrl) {
+    public ShortenResponse shortenUrl(String originalUrl) {
         String code = idGenerator.generateCode();
 
         ShortenedUrl.ShortenedUrlData data = ShortenedUrl.ShortenedUrlData.newBuilder()
@@ -38,7 +39,7 @@ public class ShortenedUrlService {
         log.info("Shortening URL: {} with code: {}", originalUrl, code);
         redisTemplate.opsForValue().set(code, data.toByteArray(), Duration.ofMinutes(5));
         log.debug("Shortened URL: {} to code: {}", originalUrl, code);
-        return code;
+        return new ShortenResponse(code);
     }
 
     public String getOriginalUrl(String code) {

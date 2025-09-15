@@ -12,6 +12,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.view.RedirectView;
 import urlshortener.dto.ShortenRequest;
+import urlshortener.dto.ShortenResponse;
 import urlshortener.dto.ShortenedUrlStats;
 import urlshortener.validation.ValidCode;
 
@@ -26,16 +27,28 @@ public class ShortenedUrlController {
         this.shortenedUrlService = shortenedUrlService;
     }
 
+    @Operation(summary = "Home page",
+            description = "Redirects to the main homepage for creating short URLs")
+    @ApiResponse(responseCode = "302", description = "Redirected to homepage")
+    @GetMapping("/")
+    public RedirectView home() {
+        return new RedirectView("/static/index.html");
+    }
+
     @Operation(summary = "Shorten a URL",
             description = "Takes a long URL and returns a short code related to it")
     @ApiResponse(responseCode = "201",
             description = "Short code created successfully",
             content = @Content(
-                    mediaType = "text/plain",
+                    mediaType = "application/json",
                     examples = @ExampleObject(
                             name = "Successful shortening",
                             description = "Returns a 5-character alphanumeric code",
-                            value = "kVOkZ"
+                            value = """
+                                    {
+                                      "shortCode": "kVOkZ"
+                                    }
+                                    """
                     )
             ))
     @ApiResponse(responseCode = "400",
@@ -54,7 +67,7 @@ public class ShortenedUrlController {
             ))
     @PostMapping("/shorten")
     @ResponseStatus(HttpStatus.CREATED)
-    public String shortenUrl(@Valid @RequestBody ShortenRequest request) {
+    public ShortenResponse shortenUrl(@Valid @RequestBody ShortenRequest request) {
         return shortenedUrlService.shortenUrl(request.originalUrl());
     }
 
