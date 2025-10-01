@@ -21,6 +21,7 @@ docker-compose up --build
 ```
 
 - App: `http://localhost:8080`
+- Swagger UI: `http://localhost:8080/swagger-ui/index.html`
 - Prometheus: `http://localhost:9090`
 - Grafana: `http://localhost:3000` (admin/admin)
 
@@ -99,7 +100,7 @@ See `test.http` for example requests you can run directly.
 | Raw KV pairs     | 1.6ms                                  | Fastest, but keeping track of all keys was becoming too complicated   |
 | Redis hashes     | 4.2ms                                  | Easier to manage than raw KV pairs, but way too slow                  |
 
-I chose Protocol buffers because despite the setup complexity, the code is still simple and readable, while still being
+I chose Protocol buffers because despite the setup complexity, the code is simple and readable, while still being
 much more efficient than JSON. Keeping track of all KV pairs and their TTLs manually was becoming too complicated, so I
 decided not to use them even though the performance would benefit. I tried using hashes, but they turned out to be the
 slowest in testing.

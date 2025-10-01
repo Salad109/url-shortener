@@ -18,7 +18,7 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
     depends_on:
       - url-shortener-app
 
@@ -26,8 +26,14 @@ services:
     image: grafana/grafana
     ports:
       - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_LOG_LEVEL=warn
     depends_on:
       - prometheus
 
 volumes:
   redis_data:
+  grafana_data:
+  prometheus_data:
