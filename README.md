@@ -63,7 +63,13 @@ Check stats:
 
 ```bash
 curl http://localhost:8080/stats/kVOkZ
-# Returns various stats
+# Returns: {
+#   "code": "kVOkZ",
+#   "originalUrl": "https://example.com",
+#   "clickCounter": 21,
+#   "createdAt": "2025-08-17T12:34:56Z",
+#   "lastClickedAt": "2025-08-17T12:34:56Z"
+# }
 ```
 
 Auto-cleanup service removes unused URLs after 5 minutes since last usage (click or creation) for demonstration
@@ -104,6 +110,12 @@ I chose Protocol buffers because despite the setup complexity, the code is simpl
 much more efficient than JSON. Keeping track of all KV pairs and their TTLs manually was becoming too complicated, so I
 decided not to use them even though the performance would benefit. I tried using hashes, but they turned out to be the
 slowest in testing.
+
+### Was it worth it
+
+I'm well aware that this project is over-engineered for a URL shortener. The goal was a performance optimization
+deep-dive on a simple domain. If it were a production system, I would stick with just the bigger wins like Redis and
+async stat updates, and keep JSON for simplicity.
 
 ![Dashboard screenshot](grafana/dashboard.webp)
 Screenshot of the Grafana dashboard during load testing
