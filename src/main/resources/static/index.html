@@ -40,9 +40,13 @@
             const errorText = await res.text();
             try {
                 const errorJson = JSON.parse(errorText);
-                throw errorJson.originalUrl || errorJson.error || 'Request failed';
-            } catch {
-                throw errorText || 'Request failed';
+                const errors = Object.values(errorJson);
+                throw errors.length > 0 ? errors.join(', ') : 'Request failed';
+            } catch (e) {
+                if (e instanceof SyntaxError) {
+                    throw errorText || 'Request failed';
+                }
+                throw e;
             }
         }
 
