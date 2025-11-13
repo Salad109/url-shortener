@@ -1,8 +1,8 @@
 package urlshortener.url;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -32,8 +32,12 @@ class ShortenedUrlServiceTest {
     @Mock
     private ShortenedUrlUpdater shortenedUrlUpdater;
 
-    @InjectMocks
     private ShortenedUrlService shortenedUrlService;
+
+    @BeforeEach
+    void setUp() {
+        shortenedUrlService = new ShortenedUrlService(redisTemplate, idGenerator, shortenedUrlUpdater, "http://test.com");
+    }
 
     @Test
     void testShortenUrl() {
@@ -43,9 +47,9 @@ class ShortenedUrlServiceTest {
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 
         ShortenResponse result = shortenedUrlService.shortenUrl(originalUrl);
-        String resultCode = result.shortCode();
 
-        assertThat(resultCode).isEqualTo(expectedCode);
+        assertThat(result.shortCode()).isEqualTo(expectedCode);
+        assertThat(result.shortUrl()).isEqualTo("http://test.com/" + expectedCode);
     }
 
     @Test

@@ -55,7 +55,7 @@
 
         try {
             const response = await api('/shorten', {originalUrl: url});
-            const short = `${location.origin}/${response.shortCode}`;
+            const short = response.shortUrl;
             show(`<strong>Short URL:</strong> <a href="${short}" target="_blank">${short}</a>`);
         } catch (e) {
             show(e, true);

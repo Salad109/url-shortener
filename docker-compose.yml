@@ -3,6 +3,8 @@ services:
     build: .
     ports:
       - "8080:8080"
+    environment:
+      - BASE_URL=${BASE_URL:-http://dogshit:8080}
     depends_on:
       - redis
 
@@ -21,6 +23,8 @@ services:
       - prometheus_data:/prometheus
     depends_on:
       - url-shortener-app
+    profiles:
+      - monitoring
 
   grafana:
     image: grafana/grafana
@@ -32,6 +36,8 @@ services:
       - GF_LOG_LEVEL=warn
     depends_on:
       - prometheus
+    profiles:
+      - monitoring
 
 volumes:
   redis_data:

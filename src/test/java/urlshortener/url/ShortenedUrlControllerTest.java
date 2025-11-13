@@ -27,8 +27,8 @@ class ShortenedUrlControllerTest {
 
     @Test
     void testShortenUrl() {
-        ShortenResponse expectedCode = new ShortenResponse("kVOkZ");
-        when(shortenedUrlService.shortenUrl("https://example.com")).thenReturn(expectedCode);
+        ShortenResponse expectedResponse = new ShortenResponse("kVOkZ", "http://test.com/kVOkZ");
+        when(shortenedUrlService.shortenUrl("https://example.com")).thenReturn(expectedResponse);
 
         assertThat(mvc.post()
                 .uri("/shorten")

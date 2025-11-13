@@ -2,6 +2,7 @@ package urlshortener.url;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import urlshortener.dto.ShortenResponse;
@@ -19,11 +20,13 @@ public class ShortenedUrlService {
     private final RedisTemplate<String, byte[]> redisTemplate;
     private final IdGenerator idGenerator;
     private final ShortenedUrlUpdater shortenedUrlUpdater;
+    private final String baseUrl;
 
-    public ShortenedUrlService(RedisTemplate<String, byte[]> redisTemplate, IdGenerator idGenerator, ShortenedUrlUpdater shortenedUrlUpdater) {
+    public ShortenedUrlService(RedisTemplate<String, byte[]> redisTemplate, IdGenerator idGenerator, ShortenedUrlUpdater shortenedUrlUpdater, @Value("${app.base-url}") String baseUrl) {
         this.redisTemplate = redisTemplate;
         this.idGenerator = idGenerator;
         this.shortenedUrlUpdater = shortenedUrlUpdater;
+        this.baseUrl = baseUrl;
     }
 
     public ShortenResponse shortenUrl(String originalUrl) {
@@ -39,7 +42,8 @@ public class ShortenedUrlService {
 
         redisTemplate.opsForValue().set(code, data.toByteArray(), Duration.ofMinutes(5));
         log.info("Shortened URL: {} to code: {}", originalUrl, code);
-        return new ShortenResponse(code);
+        String shortUrl = baseUrl + "/" + code;
+        return new ShortenResponse(code, shortUrl);
     }
 
     public String getOriginalUrl(String code) {
