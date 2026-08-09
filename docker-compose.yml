@@ -1,4 +1,22 @@
 services:
+  app:
+    build: .
+    restart: unless-stopped
+    container_name: url-shortener-app
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -qO /dev/null http://localhost:8080/health" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   postgres:
     image: postgres:18
     restart: unless-stopped

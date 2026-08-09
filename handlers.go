@@ -24,7 +24,19 @@ func (s *server) routes() http.Handler {
 	mux.HandleFunc("GET /{shortCode}", s.handleRedirect)
 	mux.HandleFunc("POST /create", s.handleCreate)
 	mux.HandleFunc("GET /stats/{shortCode}", s.handleStats)
+	mux.HandleFunc("GET /health", s.handleHealth)
 	return mux
+}
+
+func (s *server) handleHealth(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(HealthResponse{Status: "ok"}); err != nil {
+		log.Println("Failed to write response:", err)
+	}
+}
+
+type HealthResponse struct {
+	Status string `json:"status"`
 }
 
 func (s *server) handleRedirect(w http.ResponseWriter, r *http.Request) {
