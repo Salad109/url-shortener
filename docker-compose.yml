@@ -1,45 +1,21 @@
 services:
-  url-shortener-app:
-    build: .
-    ports:
-      - "8080:8080"
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    container_name: url-shortener-db
     environment:
-      - BASE_URL=${BASE_URL:-http://dogshit:8080}
-    depends_on:
-      - redis
-
-  redis:
-    image: redis
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - "127.0.0.1:6379:6379"
+      - "5432:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     volumes:
-      - redis_data:/data
-
-  prometheus:
-    image: prom/prometheus
-    ports:
-      - "9090:9090"
-    volumes:
-      - prometheus_data:/prometheus
-    depends_on:
-      - url-shortener-app
-    profiles:
-      - monitoring
-
-  grafana:
-    image: grafana/grafana
-    ports:
-      - "3000:3000"
-    volumes:
-      - grafana_data:/var/lib/grafana
-    environment:
-      - GF_LOG_LEVEL=warn
-    depends_on:
-      - prometheus
-    profiles:
-      - monitoring
+      - postgres_data:/var/lib/postgresql
 
 volumes:
-  redis_data:
-  grafana_data:
-  prometheus_data:
+  postgres_data:
