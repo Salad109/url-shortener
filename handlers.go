@@ -50,8 +50,8 @@ func (s *server) handleRedirect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Fetch the original URL from the database using the decoded ID
-	originalUrl, err := s.queries.GetOriginalUrlById(ctx, id)
+	// Record the click and fetch the original URL
+	originalUrl, err := s.queries.ProcessClick(ctx, id)
 	if err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {
 			log.Println("Failed to look up", shortCode, err)
@@ -60,10 +60,6 @@ func (s *server) handleRedirect(w http.ResponseWriter, r *http.Request) {
 		}
 		http.Error(w, "URL not found", http.StatusNotFound)
 		return
-	}
-
-	if err := s.queries.ProcessClick(ctx, id); err != nil {
-		log.Println("Failed to record click for", shortCode, err)
 	}
 
 	log.Println("Redirecting to", originalUrl)

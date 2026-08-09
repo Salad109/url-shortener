@@ -27,19 +27,6 @@ func (q *Queries) AddUrl(ctx context.Context, originalUrl string) (Url, error) {
 	return i, err
 }
 
-const getOriginalUrlById = `-- name: GetOriginalUrlById :one
-SELECT original_url
-FROM urls
-WHERE id = $1
-`
-
-func (q *Queries) GetOriginalUrlById(ctx context.Context, id int64) (string, error) {
-	row := q.db.QueryRow(ctx, getOriginalUrlById, id)
-	var original_url string
-	err := row.Scan(&original_url)
-	return original_url, err
-}
-
 const getStatsById = `-- name: GetStatsById :one
 SELECT id, original_url, created_at, click_count, last_clicked_at
 FROM urls
@@ -59,14 +46,16 @@ func (q *Queries) GetStatsById(ctx context.Context, id int64) (Url, error) {
 	return i, err
 }
 
-const processClick = `-- name: ProcessClick :exec
+const processClick = `-- name: ProcessClick :one
 UPDATE urls
 SET click_count     = click_count + 1,
     last_clicked_at = now()
-WHERE id = $1 RETURNING id, original_url, created_at, click_count, last_clicked_at
+WHERE id = $1 RETURNING original_url
 `
 
-func (q *Queries) ProcessClick(ctx context.Context, id int64) error {
-	_, err := q.db.Exec(ctx, processClick, id)
-	return err
+func (q *Queries) ProcessClick(ctx context.Context, id int64) (string, error) {
+	row := q.db.QueryRow(ctx, processClick, id)
+	var original_url string
+	err := row.Scan(&original_url)
+	return original_url, err
 }
