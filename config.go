@@ -13,11 +13,12 @@ type config struct {
 	databaseUrl     string
 	urlTtl          time.Duration
 	cleanupInterval time.Duration
+	requestTimeout  time.Duration
 }
 
 // loadConfig reads and validates all environment variables.
 func loadConfig() (config, error) {
-	var dbErr, ttlErr, cleanupErr error
+	var dbErr, ttlErr, cleanupErr, timeoutErr error
 
 	cfg := config{databaseUrl: os.Getenv("DATABASE_URL")}
 	if cfg.databaseUrl == "" {
@@ -31,7 +32,9 @@ func loadConfig() (config, error) {
 
 	cfg.cleanupInterval, cleanupErr = envDuration("CLEANUP_INTERVAL", time.Minute)
 
-	return cfg, errors.Join(dbErr, ttlErr, cleanupErr)
+	cfg.requestTimeout, timeoutErr = envDuration("REQUEST_TIMEOUT", 5*time.Second)
+
+	return cfg, errors.Join(dbErr, ttlErr, cleanupErr, timeoutErr)
 }
 
 func (c config) ttlSeconds() int32 {

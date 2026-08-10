@@ -89,12 +89,14 @@ func (s *server) handleRedirect(w http.ResponseWriter, r *http.Request) {
 	// Record the click, extend the TTL and fetch the original URL
 	originalUrl, err := s.queries.ProcessClick(ctx, db.ProcessClickParams{ID: id, TtlSeconds: s.ttlSeconds})
 	if err != nil {
-		if !errors.Is(err, pgx.ErrNoRows) {
-			log.Println("Failed to look up", shortCode, err)
-			http.Error(w, "Failed to resolve short URL", http.StatusInternalServerError)
+		if errors.Is(err, pgx.ErrNoRows) {
+			s.handleNotFound(w, r)
 			return
 		}
-		s.handleNotFound(w, r)
+		if ctx.Err() == nil {
+			log.Println("Failed to look up", shortCode, err)
+		}
+		http.Error(w, "Failed to resolve short URL", http.StatusInternalServerError)
 		return
 	}
 
@@ -162,7 +164,9 @@ func (s *server) handleStats(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "URL not found", http.StatusNotFound)
 			return
 		}
-		log.Println("Failed to retrieve stats for", shortCode, err)
+		if ctx.Err() == nil {
+			log.Println("Failed to retrieve stats for", shortCode, err)
+		}
 		http.Error(w, "Failed to retrieve stats", http.StatusInternalServerError)
 		return
 	}

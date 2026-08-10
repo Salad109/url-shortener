@@ -40,9 +40,11 @@ func main() {
 
 	log.Println("URL TTL is", cfg.urlTtl)
 	log.Println("Expired URLs are deleted every", cfg.cleanupInterval)
+	log.Println("Request timeout is", cfg.requestTimeout)
 	log.Println("Server is running on port 8080")
 
-	log.Fatal(http.ListenAndServe(":8080", srv.routes()))
+	handler := http.TimeoutHandler(srv.routes(), cfg.requestTimeout, "Server is busy, try again shortly")
+	log.Fatal(http.ListenAndServe(":8080", handler))
 }
 
 func runMigrations(ctx context.Context, pool *pgxpool.Pool) {
