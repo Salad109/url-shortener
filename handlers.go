@@ -115,7 +115,7 @@ func (s *server) handleCreate(w http.ResponseWriter, r *http.Request) {
 
 	// Validate URL input
 	u, err := url.Parse(req.OriginalURL)
-	if err != nil || u.Scheme == "" || u.Host == "" || len(req.OriginalURL) > 2048 {
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || len(req.OriginalURL) > 2048 {
 		http.Error(w, "Invalid URL", http.StatusBadRequest)
 		return
 	}
