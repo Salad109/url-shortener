@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1" name="viewport">
+    <title>URL Shortener</title>
+    <link href="/static/app.css" rel="stylesheet">
+</head>
+<body>
+<main class="sheet">
+    <header>
+        <p class="eyebrow">Temporary short links</p>
+        <h1><a href="/">URL Shortener</a></h1>
+        <p class="lede">Paste a long URL to get a short link, or paste a short code to check its stats.
+            Unused links are deleted, but using one resets its timer.</p>
+    </header>
+
+    <div class="rule"></div>
+
+    <form id="form">
+        <label class="visually-hidden" for="field">Long URL, or a short code to look up</label>
+        <input autocomplete="off" autofocus class="field" id="field"
+               placeholder="https://example.com/… or a short code" required spellcheck="false">
+        <div class="actions">
+            <button class="button button--primary" type="submit">Shorten</button>
+            <button class="button" id="statsButton" type="button">Get stats</button>
+        </div>
+    </form>
+
+    <section aria-live="polite" class="out" id="out">
+        <p class="resting">Nothing here yet.</p>
+    </section>
+
+    <details class="api">
+        <summary>
+            API guide
+            <svg aria-hidden="true" class="chevron" viewBox="0 0 11 7">
+                <path d="M1 1l4.5 4.5L10 1" fill="none" stroke="currentColor" stroke-linecap="round"
+                      stroke-width="1.6"/>
+            </svg>
+        </summary>
+
+        <article class="endpoint" data-endpoint="create">
+            <div class="endpoint__head">
+                <span class="method method--post">POST</span>
+                <code class="path">/create</code>
+                <button class="send" data-send type="button">Send</button>
+            </div>
+            <p class="endpoint__note">Shortens a URL. Returns the code and the moment it expires.</p>
+            <label class="param">
+                <span>original_url</span>
+                <input data-param spellcheck="false" value="https://example.com/a/very/long/url">
+            </label>
+            <pre class="response" data-response hidden></pre>
+        </article>
+
+        <article class="endpoint" data-endpoint="redirect">
+            <div class="endpoint__head">
+                <span class="method method--get">GET</span>
+                <code class="path">/{code}</code>
+                <a class="send" data-open rel="noopener" target="_blank">Open</a>
+            </div>
+            <p class="endpoint__note">Redirects to the original URL, counts the click and resets the timer.</p>
+            <label class="param">
+                <span>code</span>
+                <input data-code-param placeholder="shorten something first" spellcheck="false">
+            </label>
+        </article>
+
+        <article class="endpoint" data-endpoint="stats">
+            <div class="endpoint__head">
+                <span class="method method--get">GET</span>
+                <code class="path">/stats/{code}</code>
+                <button class="send" data-send type="button">Send</button>
+            </div>
+            <p class="endpoint__note">Reads the stats without resetting the timer. 404s once the link expires.</p>
+            <label class="param">
+                <span>code</span>
+                <input data-code-param placeholder="shorten something first" spellcheck="false">
+            </label>
+            <pre class="response" data-response hidden></pre>
+        </article>
+    </details>
+</main>
+
+<template id="stubTemplate">
+    <article class="stub">
+        <div class="stub__grip"><span class="stub__serial" data-serial></span></div>
+        <div class="stub__body">
+            <p class="stub__label" data-label></p>
+            <div class="stub__headline">
+                <a class="stub__code" data-code></a>
+                <button class="copy" data-copy type="button">Copy</button>
+            </div>
+            <dl class="facts" data-facts></dl>
+            <div class="meter">
+                <div class="meter__track">
+                    <div class="meter__fill" data-fill></div>
+                </div>
+                <p class="meter__caption">
+                    <span data-scale></span>
+                    <span class="meter__remaining" data-remaining></span>
+                </p>
+            </div>
+        </div>
+    </article>
+</template>
+
+<script>
+    const form = document.getElementById("form");
+    const field = document.getElementById("field");
+    const out = document.getElementById("out");
+    const template = document.getElementById("stubTemplate");
+    const buttons = document.querySelectorAll(".button");
+    const openLink = document.querySelector("[data-open]");
+    const openInput = document.querySelector('[data-endpoint="redirect"] [data-code-param]');
+
+    let ticking = null;
+    let lastCode = "";
+
+    function request(kind, value) {
+        if (kind === "create") {
+            return fetch("/create", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({original_url: value}),
+            });
+        }
+        return fetch(`/stats/${encodeURIComponent(value)}`);
+    }
+
+    function refreshOpen() {
+        const code = openInput.value.trim();
+        if (code) openLink.href = `/${encodeURIComponent(code)}`;
+        else openLink.removeAttribute("href");
+    }
+
+    function syncCode(code) {
+        document.querySelectorAll("[data-code-param]").forEach(input => {
+            if (!input.value || input.value === lastCode) input.value = code;
+        });
+        lastCode = code;
+        refreshOpen();
+    }
+
+    function clear() {
+        clearInterval(ticking);
+        ticking = null;
+        out.replaceChildren();
+    }
+
+    function notice(text) {
+        clear();
+        const p = document.createElement("p");
+        p.className = "notice";
+        p.textContent = text.trim() || "Something went wrong";
+        out.append(p);
+    }
+
+    function duration(ms) {
+        const seconds = Math.max(0, Math.round(ms / 1000));
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        if (hours) return `${hours}h ${String(minutes).padStart(2, "0")}m`;
+        return `${minutes}:${String(seconds % 60).padStart(2, "0")}`;
+    }
+
+    function stub({label, code, href, facts, expiresAt, startedAt}) {
+        clear();
+
+        const node = template.content.cloneNode(true).firstElementChild;
+        const link = node.querySelector("[data-code]");
+        const copy = node.querySelector("[data-copy]");
+        const list = node.querySelector("[data-facts]");
+        const fill = node.querySelector("[data-fill]");
+        const remaining = node.querySelector("[data-remaining]");
+
+        node.querySelector("[data-serial]").textContent = code;
+        node.querySelector("[data-label]").textContent = label;
+        link.textContent = href.replace(/^https?:\/\//, "");
+        link.href = href;
+
+        for (const [term, value] of facts) {
+            const dt = document.createElement("dt");
+            dt.textContent = term;
+            const dd = document.createElement("dd");
+            dd.textContent = value;
+            list.append(dt, dd);
+        }
+
+        const expiry = new Date(expiresAt).getTime();
+        const total = expiry - new Date(startedAt).getTime();
+        node.querySelector("[data-scale]").textContent = `${duration(total)} total`;
+
+        function tick() {
+            const left = expiry - Date.now();
+            const ratio = total > 0 ? Math.min(1, Math.max(0, left / total)) : 0;
+            fill.style.width = `${ratio * 100}%`;
+            node.classList.toggle("is-low", left > 0 && ratio < .2);
+            node.classList.toggle("is-expired", left <= 0);
+            remaining.textContent = left > 0 ? `${duration(left)} left` : "Expired";
+            if (left <= 0) {
+                clearInterval(ticking);
+                ticking = null;
+            }
+        }
+
+        copy.addEventListener("click", async () => {
+            try {
+                await navigator.clipboard.writeText(href);
+                copy.textContent = "Copied";
+                copy.dataset.state = "done";
+                setTimeout(() => {
+                    copy.textContent = "Copy";
+                    delete copy.dataset.state;
+                }, 1600);
+            } catch {
+                const range = document.createRange();
+                range.selectNodeContents(link);
+                const selection = getSelection();
+                selection.removeAllRanges();
+                selection.addRange(range);
+                copy.textContent = "Selected";
+            }
+        });
+
+        out.append(node);
+        tick();
+        ticking = setInterval(tick, 1000);
+        syncCode(code);
+    }
+
+    async function shorten(value) {
+        const response = await request("create", value);
+        if (!response.ok) return notice(await response.text());
+
+        const data = await response.json();
+        stub({
+            label: "Shortened",
+            code: data.short_code,
+            href: `${location.origin}/${data.short_code}`,
+            facts: [["Points to", value]],
+            expiresAt: data.expires_at,
+            startedAt: Date.now(),
+        });
+    }
+
+    async function stats(value) {
+        const response = await request("stats", value.replace(/\/+$/, "").split("/").pop());
+        if (!response.ok) return notice(await response.text());
+
+        const data = await response.json();
+        const clicked = data.last_clicked_at;
+        stub({
+            label: "Stats",
+            code: data.short_code,
+            href: `${location.origin}/${data.short_code}`,
+            facts: [
+                ["Points to", data.original_url],
+                ["Clicks", data.clicks],
+                ["Created", new Date(data.created_at).toLocaleString()],
+                ["Last click", clicked ? new Date(clicked).toLocaleString() : "Never"],
+            ],
+            expiresAt: data.expires_at,
+            startedAt: clicked || data.created_at,
+        });
+    }
+
+    async function run(action) {
+        const value = field.value.trim();
+        if (!value) return;
+
+        buttons.forEach(button => button.disabled = true);
+        try {
+            await action(value);
+        } catch {
+            notice("Could not reach the server");
+        } finally {
+            buttons.forEach(button => button.disabled = false);
+        }
+    }
+
+    async function call(endpoint) {
+        const kind = endpoint.dataset.endpoint;
+        const button = endpoint.querySelector("[data-send]");
+        const target = endpoint.querySelector("[data-response]");
+
+        button.disabled = true;
+        try {
+            const response = await request(kind, endpoint.querySelector("[data-param]").value.trim());
+            const text = await response.text();
+
+            let parsed = null;
+            try {
+                parsed = JSON.parse(text);
+            } catch {
+                parsed = null;
+            }
+
+            target.hidden = false;
+            target.dataset.status = response.ok ? "ok" : "error";
+            target.textContent = `${response.status} ${response.statusText}
+
+`
+                + (parsed ? JSON.stringify(parsed, null, 2) : text.trim());
+
+            if (kind === "create" && parsed?.short_code) syncCode(parsed.short_code);
+        } catch {
+            target.hidden = false;
+            target.dataset.status = "error";
+            target.textContent = "Could not reach the server";
+        } finally {
+            button.disabled = false;
+        }
+    }
+
+    form.addEventListener("submit", event => {
+        event.preventDefault();
+        run(shorten);
+    });
+    document.getElementById("statsButton").addEventListener("click", () => run(stats));
+    document.querySelectorAll("[data-send]").forEach(button =>
+        button.addEventListener("click", () => call(button.closest(".endpoint"))));
+    openInput.addEventListener("input", refreshOpen);
+    refreshOpen();
+</script>
+</body>
+</html>

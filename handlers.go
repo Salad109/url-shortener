@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"log"
@@ -14,6 +15,15 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+//go:embed static/index.html
+var indexPage []byte
+
+//go:embed static/404.html
+var notFoundPage []byte
+
+//go:embed static/app.css
+var styleSheet []byte
+
 // server holds the dependencies shared by every handler.
 type server struct {
 	queries    *db.Queries
@@ -22,11 +32,36 @@ type server struct {
 
 func (s *server) routes() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /{$}", s.handleIndex)
+	mux.HandleFunc("GET /static/app.css", s.handleStyles)
+	mux.HandleFunc("GET /", s.handleNotFound)
 	mux.HandleFunc("GET /{shortCode}", s.handleRedirect)
 	mux.HandleFunc("POST /create", s.handleCreate)
 	mux.HandleFunc("GET /stats/{shortCode}", s.handleStats)
 	mux.HandleFunc("GET /health", s.handleHealth)
 	return mux
+}
+
+func (s *server) handleIndex(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if _, err := w.Write(indexPage); err != nil {
+		log.Println("Failed to write response:", err)
+	}
+}
+
+func (s *server) handleStyles(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "text/css; charset=utf-8")
+	if _, err := w.Write(styleSheet); err != nil {
+		log.Println("Failed to write response:", err)
+	}
+}
+
+func (s *server) handleNotFound(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusNotFound)
+	if _, err := w.Write(notFoundPage); err != nil {
+		log.Println("Failed to write response:", err)
+	}
 }
 
 func (s *server) handleHealth(w http.ResponseWriter, _ *http.Request) {
@@ -47,7 +82,7 @@ func (s *server) handleRedirect(w http.ResponseWriter, r *http.Request) {
 	// Decode short code into ID
 	id, err := transcoding.Decode(shortCode)
 	if err != nil {
-		http.Error(w, "URL not found", http.StatusNotFound) // 404, don't leak implementation details
+		s.handleNotFound(w, r) // 404, don't leak implementation details
 		return
 	}
 
@@ -59,7 +94,7 @@ func (s *server) handleRedirect(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Failed to resolve short URL", http.StatusInternalServerError)
 			return
 		}
-		http.Error(w, "URL not found", http.StatusNotFound)
+		s.handleNotFound(w, r)
 		return
 	}
 
@@ -93,6 +128,7 @@ func (s *server) handleCreate(w http.ResponseWriter, r *http.Request) {
 	// Encode ID into the short code
 	resp := CreateUrlResponse{
 		ShortCode: transcoding.Encode(row.ID),
+		ExpiresAt: row.ExpiresAt,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -106,7 +142,8 @@ type CreateUrlRequest struct {
 }
 
 type CreateUrlResponse struct {
-	ShortCode string `json:"short_code"`
+	ShortCode string             `json:"short_code"`
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
 }
 
 func (s *server) handleStats(w http.ResponseWriter, r *http.Request) {
@@ -131,12 +168,12 @@ func (s *server) handleStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := GetStatsResponse{
-		ShortCode:   shortCode,
-		OriginalURL: row.OriginalUrl,
-		CreatedAt:   row.CreatedAt,
-		Clicks:      row.ClickCount,
-		LastClick:   row.LastClickedAt,
-		ExpiresAt:   row.ExpiresAt,
+		ShortCode:     shortCode,
+		OriginalURL:   row.OriginalUrl,
+		CreatedAt:     row.CreatedAt,
+		Clicks:        row.ClickCount,
+		LastClickedAt: row.LastClickedAt,
+		ExpiresAt:     row.ExpiresAt,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -146,10 +183,10 @@ func (s *server) handleStats(w http.ResponseWriter, r *http.Request) {
 }
 
 type GetStatsResponse struct {
-	ShortCode   string             `json:"shortCode"`
-	OriginalURL string             `json:"original_url"`
-	CreatedAt   pgtype.Timestamptz `json:"created_at"`
-	Clicks      int64              `json:"clicks"`
-	LastClick   pgtype.Timestamptz `json:"last_click"`
-	ExpiresAt   pgtype.Timestamptz `json:"expires_at"`
+	ShortCode     string             `json:"short_code"`
+	OriginalURL   string             `json:"original_url"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	Clicks        int64              `json:"clicks"`
+	LastClickedAt pgtype.Timestamptz `json:"last_clicked_at"`
+	ExpiresAt     pgtype.Timestamptz `json:"expires_at"`
 }

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1" name="viewport">
+    <title>No link here</title>
+    <link href="/static/app.css" rel="stylesheet">
+</head>
+<body>
+<main class="sheet">
+    <p class="eyebrow">Not found</p>
+    <h1>No link here</h1>
+    <p class="lede">This link expired, or it never existed.</p>
+
+    <div class="rule"></div>
+
+    <article class="stub is-expired">
+        <div class="stub__grip"></div>
+        <div class="stub__body">
+            <p class="stub__label">Requested</p>
+            <p class="stub__code" id="code">this link</p>
+            <div class="meter">
+                <div class="meter__track"></div>
+                <p class="meter__caption">
+                    <span>No time left</span>
+                    <span class="meter__remaining">Expired</span>
+                </p>
+            </div>
+        </div>
+        <span class="stamp">Void</span>
+    </article>
+
+    <a class="back" href="/">Shorten a link</a>
+</main>
+
+<script>
+    const path = decodeURIComponent(location.pathname).slice(1, 40);
+    if (path) document.getElementById("code").textContent = `${location.host}/${path}`;
+</script>
+</body>
+</html>
