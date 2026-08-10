@@ -3,10 +3,9 @@ services:
     build: .
     restart: unless-stopped
     container_name: url-shortener-app
-    environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    env_file: .env
     ports:
-      - "${APP_PORT:-8080}:8080"
+      - "${HOST_PORT:-8080}:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -21,10 +20,7 @@ services:
     image: postgres:18
     restart: unless-stopped
     container_name: url-shortener-db
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+    env_file: .env
     ports:
       - "5432:5432"
     healthcheck:

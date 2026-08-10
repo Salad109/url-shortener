@@ -14,4 +14,5 @@ type Url struct {
 	CreatedAt     pgtype.Timestamptz
 	ClickCount    int64
 	LastClickedAt pgtype.Timestamptz
+	ExpiresAt     pgtype.Timestamptz
 }

@@ -5,7 +5,6 @@ import (
 	"embed"
 	"log"
 	"net/http"
-	"os"
 
 	db "url-shortener/db/generated"
 
@@ -18,14 +17,14 @@ import (
 var migrations embed.FS
 
 func main() {
-	ctx := context.Background()
-
-	dbUrl := os.Getenv("DATABASE_URL")
-	if dbUrl == "" {
-		log.Fatal("DATABASE_URL is not set")
+	cfg, err := loadConfig()
+	if err != nil {
+		log.Fatal("Invalid configuration:\n", err)
 	}
 
-	pool, err := pgxpool.New(ctx, dbUrl)
+	ctx := context.Background()
+
+	pool, err := pgxpool.New(ctx, cfg.databaseUrl)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -33,15 +32,17 @@ func main() {
 
 	runMigrations(ctx, pool)
 
-	srv := &server{queries: db.New(pool)}
+	queries := db.New(pool)
 
-	appPort := os.Getenv("APP_PORT")
-	if appPort == "" {
-		appPort = "8080"
-	}
+	srv := &server{queries: queries, ttlSeconds: cfg.ttlSeconds()}
 
-	log.Println("Server is running on port " + appPort)
-	log.Fatal(http.ListenAndServe(":"+appPort, srv.routes()))
+	go runCleanup(ctx, queries, cfg.cleanupInterval)
+
+	log.Println("URL TTL is", cfg.urlTtl)
+	log.Println("Expired URLs are deleted every", cfg.cleanupInterval)
+	log.Println("Server is running on port 8080")
+
+	log.Fatal(http.ListenAndServe(":8080", srv.routes()))
 }
 
 func runMigrations(ctx context.Context, pool *pgxpool.Pool) {

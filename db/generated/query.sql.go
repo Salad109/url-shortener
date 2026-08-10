@@ -10,12 +10,17 @@ import (
 )
 
 const addUrl = `-- name: AddUrl :one
-INSERT INTO urls (original_url)
-VALUES ($1) RETURNING id, original_url, created_at, click_count, last_clicked_at
+INSERT INTO urls (original_url, expires_at)
+VALUES ($1, now() + ($2::int * INTERVAL '1 second')) RETURNING id, original_url, created_at, click_count, last_clicked_at, expires_at
 `
 
-func (q *Queries) AddUrl(ctx context.Context, originalUrl string) (Url, error) {
-	row := q.db.QueryRow(ctx, addUrl, originalUrl)
+type AddUrlParams struct {
+	OriginalUrl string
+	TtlSeconds  int32
+}
+
+func (q *Queries) AddUrl(ctx context.Context, arg AddUrlParams) (Url, error) {
+	row := q.db.QueryRow(ctx, addUrl, arg.OriginalUrl, arg.TtlSeconds)
 	var i Url
 	err := row.Scan(
 		&i.ID,
@@ -23,14 +28,36 @@ func (q *Queries) AddUrl(ctx context.Context, originalUrl string) (Url, error) {
 		&i.CreatedAt,
 		&i.ClickCount,
 		&i.LastClickedAt,
+		&i.ExpiresAt,
 	)
 	return i, err
 }
 
+const deleteExpiredUrls = `-- name: DeleteExpiredUrls :execrows
+DELETE
+FROM urls USING (SELECT id
+                 FROM urls
+                 WHERE expires_at <= now()
+                 ORDER BY expires_at
+                 LIMIT $1 FOR UPDATE SKIP LOCKED) AS expired
+WHERE urls.id = expired.id
+`
+
+// SKIP LOCKED keeps the sweep off rows a concurrent click is already updating,
+// and makes the sweep safe to run from more than one app instance.
+func (q *Queries) DeleteExpiredUrls(ctx context.Context, limit int32) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteExpiredUrls, limit)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getStatsById = `-- name: GetStatsById :one
-SELECT id, original_url, created_at, click_count, last_clicked_at
+SELECT id, original_url, created_at, click_count, last_clicked_at, expires_at
 FROM urls
 WHERE id = $1
+  AND expires_at > now()
 `
 
 func (q *Queries) GetStatsById(ctx context.Context, id int64) (Url, error) {
@@ -42,6 +69,7 @@ func (q *Queries) GetStatsById(ctx context.Context, id int64) (Url, error) {
 		&i.CreatedAt,
 		&i.ClickCount,
 		&i.LastClickedAt,
+		&i.ExpiresAt,
 	)
 	return i, err
 }
@@ -49,12 +77,19 @@ func (q *Queries) GetStatsById(ctx context.Context, id int64) (Url, error) {
 const processClick = `-- name: ProcessClick :one
 UPDATE urls
 SET click_count     = click_count + 1,
-    last_clicked_at = now()
-WHERE id = $1 RETURNING original_url
+    last_clicked_at = now(),
+    expires_at      = now() + ($1::int * INTERVAL '1 second')
+WHERE id = $2
+  AND expires_at > now() RETURNING original_url
 `
 
-func (q *Queries) ProcessClick(ctx context.Context, id int64) (string, error) {
-	row := q.db.QueryRow(ctx, processClick, id)
+type ProcessClickParams struct {
+	TtlSeconds int32
+	ID         int64
+}
+
+func (q *Queries) ProcessClick(ctx context.Context, arg ProcessClickParams) (string, error) {
+	row := q.db.QueryRow(ctx, processClick, arg.TtlSeconds, arg.ID)
 	var original_url string
 	err := row.Scan(&original_url)
 	return original_url, err

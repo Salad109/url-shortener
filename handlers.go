@@ -16,7 +16,8 @@ import (
 
 // server holds the dependencies shared by every handler.
 type server struct {
-	queries *db.Queries
+	queries    *db.Queries
+	ttlSeconds int32
 }
 
 func (s *server) routes() http.Handler {
@@ -50,8 +51,8 @@ func (s *server) handleRedirect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Record the click and fetch the original URL
-	originalUrl, err := s.queries.ProcessClick(ctx, id)
+	// Record the click, extend the TTL and fetch the original URL
+	originalUrl, err := s.queries.ProcessClick(ctx, db.ProcessClickParams{ID: id, TtlSeconds: s.ttlSeconds})
 	if err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {
 			log.Println("Failed to look up", shortCode, err)
@@ -83,7 +84,7 @@ func (s *server) handleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Insert URL into the database
-	row, err := s.queries.AddUrl(r.Context(), req.OriginalURL)
+	row, err := s.queries.AddUrl(r.Context(), db.AddUrlParams{OriginalUrl: req.OriginalURL, TtlSeconds: s.ttlSeconds})
 	if err != nil {
 		http.Error(w, "Failed to create short URL", http.StatusInternalServerError)
 		return
@@ -135,6 +136,7 @@ func (s *server) handleStats(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:   row.CreatedAt,
 		Clicks:      row.ClickCount,
 		LastClick:   row.LastClickedAt,
+		ExpiresAt:   row.ExpiresAt,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -149,4 +151,5 @@ type GetStatsResponse struct {
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	Clicks      int64              `json:"clicks"`
 	LastClick   pgtype.Timestamptz `json:"last_click"`
+	ExpiresAt   pgtype.Timestamptz `json:"expires_at"`
 }
