@@ -38,13 +38,10 @@ DELETE
 FROM urls USING (SELECT id
                  FROM urls
                  WHERE expires_at <= now()
-                 ORDER BY expires_at
                  LIMIT $1 FOR UPDATE SKIP LOCKED) AS expired
 WHERE urls.id = expired.id
 `
 
-// SKIP LOCKED keeps the sweep off rows a concurrent click is already updating,
-// and makes the sweep safe to run from more than one app instance.
 func (q *Queries) DeleteExpiredUrls(ctx context.Context, limit int32) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteExpiredUrls, limit)
 	if err != nil {

@@ -21,6 +21,5 @@ DELETE
 FROM urls USING (SELECT id
                  FROM urls
                  WHERE expires_at <= now()
-                 ORDER BY expires_at
                  LIMIT $1 FOR UPDATE SKIP LOCKED) AS expired
 WHERE urls.id = expired.id;
