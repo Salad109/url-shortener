@@ -21,6 +21,9 @@ var indexPage []byte
 //go:embed static/404.html
 var notFoundPage []byte
 
+//go:embed static/error.html
+var errorPage []byte
+
 //go:embed static/app.css
 var styleSheet []byte
 
@@ -42,11 +45,34 @@ func (s *server) routes() http.Handler {
 	return mux
 }
 
-func (s *server) handleIndex(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if _, err := w.Write(indexPage); err != nil {
+// writeJSON sends v as the response body.
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(v); err != nil {
 		log.Println("Failed to write response:", err)
 	}
+}
+
+func writeError(w http.ResponseWriter, status int, message string) {
+	writeJSON(w, status, ErrorResponse{Error: message})
+}
+
+type ErrorResponse struct {
+	Error string `json:"error"`
+}
+
+// writeHTML sends an embedded page to a browser-facing route.
+func writeHTML(w http.ResponseWriter, status int, page []byte) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(status)
+	if _, err := w.Write(page); err != nil {
+		log.Println("Failed to write response:", err)
+	}
+}
+
+func (s *server) handleIndex(w http.ResponseWriter, _ *http.Request) {
+	writeHTML(w, http.StatusOK, indexPage)
 }
 
 func (s *server) handleStyles(w http.ResponseWriter, _ *http.Request) {
@@ -57,18 +83,11 @@ func (s *server) handleStyles(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *server) handleNotFound(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(http.StatusNotFound)
-	if _, err := w.Write(notFoundPage); err != nil {
-		log.Println("Failed to write response:", err)
-	}
+	writeHTML(w, http.StatusNotFound, notFoundPage)
 }
 
 func (s *server) handleHealth(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(HealthResponse{Status: "ok"}); err != nil {
-		log.Println("Failed to write response:", err)
-	}
+	writeJSON(w, http.StatusOK, HealthResponse{Status: "ok"})
 }
 
 type HealthResponse struct {
@@ -96,7 +115,7 @@ func (s *server) handleRedirect(w http.ResponseWriter, r *http.Request) {
 		if ctx.Err() == nil {
 			log.Println("Failed to look up", shortCode, err)
 		}
-		http.Error(w, "Failed to resolve short URL", http.StatusInternalServerError)
+		writeHTML(w, http.StatusInternalServerError, errorPage)
 		return
 	}
 
@@ -105,25 +124,30 @@ func (s *server) handleRedirect(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) handleCreate(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
 	var req CreateUrlRequest
 
 	// Parse request body
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "Invalid JSON")
 		return
 	}
 
 	// Validate URL input
 	u, err := url.Parse(req.OriginalURL)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || len(req.OriginalURL) > 2048 {
-		http.Error(w, "Invalid URL", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "Invalid URL")
 		return
 	}
 
 	// Insert URL into the database
-	row, err := s.queries.AddUrl(r.Context(), db.AddUrlParams{OriginalUrl: req.OriginalURL, TtlSeconds: s.ttlSeconds})
+	row, err := s.queries.AddUrl(ctx, db.AddUrlParams{OriginalUrl: req.OriginalURL, TtlSeconds: s.ttlSeconds})
 	if err != nil {
-		http.Error(w, "Failed to create short URL", http.StatusInternalServerError)
+		if ctx.Err() == nil {
+			log.Println("Failed to shorten", req.OriginalURL, err)
+		}
+		writeError(w, http.StatusInternalServerError, "Failed to create short URL")
 		return
 	}
 
@@ -133,10 +157,7 @@ func (s *server) handleCreate(w http.ResponseWriter, r *http.Request) {
 		ExpiresAt: row.ExpiresAt,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		log.Println("Failed to write response:", err)
-	}
+	writeJSON(w, http.StatusCreated, resp)
 }
 
 type CreateUrlRequest struct {
@@ -154,20 +175,20 @@ func (s *server) handleStats(w http.ResponseWriter, r *http.Request) {
 
 	id, err := transcoding.Decode(shortCode)
 	if err != nil {
-		http.Error(w, "URL not found", http.StatusNotFound)
+		writeError(w, http.StatusNotFound, "URL not found")
 		return
 	}
 
 	row, err := s.queries.GetStatsById(ctx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			http.Error(w, "URL not found", http.StatusNotFound)
+			writeError(w, http.StatusNotFound, "URL not found")
 			return
 		}
 		if ctx.Err() == nil {
 			log.Println("Failed to retrieve stats for", shortCode, err)
 		}
-		http.Error(w, "Failed to retrieve stats", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "Failed to retrieve stats")
 		return
 	}
 
@@ -180,10 +201,7 @@ func (s *server) handleStats(w http.ResponseWriter, r *http.Request) {
 		ExpiresAt:     row.ExpiresAt,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		log.Println("Failed to write response:", err)
-	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 type GetStatsResponse struct {
