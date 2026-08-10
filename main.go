@@ -5,6 +5,7 @@ import (
 	"embed"
 	"log"
 	"net/http"
+	"time"
 
 	db "url-shortener/db/generated"
 
@@ -44,7 +45,15 @@ func main() {
 	log.Println("Server is running on port 8080")
 
 	handler := http.TimeoutHandler(srv.routes(), cfg.requestTimeout, "Server is busy, try again shortly")
-	log.Fatal(http.ListenAndServe(":8080", handler))
+
+	httpServer := &http.Server{
+		Addr:         ":8080",
+		Handler:      handler,
+		ReadTimeout:  cfg.requestTimeout,
+		WriteTimeout: cfg.requestTimeout + time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+	log.Fatal(httpServer.ListenAndServe())
 }
 
 func runMigrations(ctx context.Context, pool *pgxpool.Pool) {
