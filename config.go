@@ -4,13 +4,16 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"net/url"
 	"os"
+	"strings"
 	"time"
 )
 
 // config holds every setting the app reads from the environment variables.
 type config struct {
 	databaseUrl     string
+	baseUrl         string
 	urlTtl          time.Duration
 	cleanupInterval time.Duration
 	requestTimeout  time.Duration
@@ -18,12 +21,14 @@ type config struct {
 
 // loadConfig reads and validates all environment variables.
 func loadConfig() (config, error) {
-	var dbErr, ttlErr, cleanupErr, timeoutErr error
+	var dbErr, baseUrlErr, ttlErr, cleanupErr, timeoutErr error
 
 	cfg := config{databaseUrl: os.Getenv("DATABASE_URL")}
 	if cfg.databaseUrl == "" {
 		dbErr = errors.New("DATABASE_URL is not set")
 	}
+
+	cfg.baseUrl, baseUrlErr = envUrl("BASE_URL", "http://localhost:8080")
 
 	cfg.urlTtl, ttlErr = envDuration("URL_TTL", 5*time.Minute)
 	if ttlErr == nil && (cfg.urlTtl < time.Second || cfg.urlTtl.Seconds() > math.MaxInt32) {
@@ -34,11 +39,26 @@ func loadConfig() (config, error) {
 
 	cfg.requestTimeout, timeoutErr = envDuration("REQUEST_TIMEOUT", 5*time.Second)
 
-	return cfg, errors.Join(dbErr, ttlErr, cleanupErr, timeoutErr)
+	return cfg, errors.Join(dbErr, baseUrlErr, ttlErr, cleanupErr, timeoutErr)
 }
 
 func (c config) ttlSeconds() int32 {
 	return int32(c.urlTtl.Seconds())
+}
+
+// envUrl reads an absolute http(s) url with no trailing slash.
+func envUrl(key, fallback string) (string, error) {
+	value := os.Getenv(key)
+	if value == "" {
+		value = fallback
+	}
+
+	u, err := url.Parse(value)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return "", fmt.Errorf(`%s: %q is not an absolute http(s) URL (try "https://example.com")`, key, value)
+	}
+
+	return strings.TrimSuffix(value, "/"), nil
 }
 
 // envDuration reads a Go duration string variable.

@@ -30,6 +30,7 @@ var styleSheet []byte
 // server holds the dependencies shared by every handler.
 type server struct {
 	queries    *db.Queries
+	baseUrl    string
 	ttlSeconds int32
 }
 
@@ -152,8 +153,10 @@ func (s *server) handleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Encode ID into the short code
+	shortCode := transcoding.Encode(row.ID)
 	resp := CreateUrlResponse{
-		ShortCode: transcoding.Encode(row.ID),
+		ShortCode: shortCode,
+		ShortURL:  s.baseUrl + "/" + shortCode,
 		ExpiresAt: row.ExpiresAt,
 	}
 
@@ -166,6 +169,7 @@ type CreateUrlRequest struct {
 
 type CreateUrlResponse struct {
 	ShortCode string             `json:"short_code"`
+	ShortURL  string             `json:"short_url"`
 	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
 }
 
