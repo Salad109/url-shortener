@@ -120,7 +120,6 @@ func (s *server) handleRedirect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Println("Redirecting to", originalUrl)
 	http.Redirect(w, r, originalUrl, http.StatusFound)
 }
 

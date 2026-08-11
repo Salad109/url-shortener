@@ -1,121 +1,108 @@
 # URL Shortener
 
-A URL shortener built with a focus on performance using Spring Boot. Takes long URLs and converts them into short codes
-with click tracking and analytics.
+A URL shortener built with a focus on performance using Go. Takes long URLs and converts them into short codes that
+expire from disuse, with click tracking and analytics.
 
-## Features
+https://very-very-long-url.com/it-sure-is-very-long-and-ugly/1234567890/goober becomes http://localhost:8080/kVOkZ
 
-Submit a long URL, get back an up to 5-character long code. Click the short link, get redirected to your original URL.
-Check stats to see how many times it's been clicked.
+## Lore
 
-```
-https://very-very-long-url.com/it-sure-is-very-long-and-ugly/1234567890/goober 
-becomes 
-http://localhost:8080/kVOkZ
-```
+This started as a Spring Boot-based performance optimization deep-dive, with a Redis store, protocol buffers instead of
+JSON, and asynchronous stat updates. That implementation and its write-up are preserved in [
+`README-spring.md`](README-spring.md)
+
+The Go rewrite keeps the ID scrambling trick, but swaps pretty much the entire stack. Redis+protobufs became
+Postgres+sqlc, and Spring Boot became standard Go. The performance focus remains.
 
 ## Getting started
 
 ```bash
-docker-compose up --build
+cp .env.example .env
+# Edit .env and fill in all required values
+docker compose up -d --build
 ```
 
-- App: `http://localhost:8080`
-- Swagger UI: `http://localhost:8080/swagger-ui/index.html`
-- Prometheus: `http://localhost:9090`
-- Grafana: `http://localhost:3000` (admin/admin)
+`test.http` has example requests for every endpoint.
 
-## The ID scrambling
+## API
 
-Instead of using randomized strings, which is a wasteful use of the 5-character space, or directly exposing sequential
-database IDs (1, 2, 3...), the app scrambles them using reversible modulo arithmetic:
+Shorten a URL:
+
+```bash
+curl -X POST http://localhost:8080/create -H "Content-Type: application/json" -d '{"original_url": "https://example.com"}'
+```
+
+Returns:
+
+```json
+{
+  "short_code": "kVOkZ",
+  "short_url": "http://localhost:8080/kVOkZ",
+  "expires_at": "..."
+}
+```
+
+Get redirected to the original URL, updating the stats and bumping the expiration date:
+
+```bash
+curl -i http://localhost:8080/kVOkZ
+# 302 Location: https://example.com
+```
+
+Check the stats, without resetting the timer:
+
+```bash
+curl http://localhost:8080/stats/kVOkZ
+```
+
+Returns:
+
+```json
+{
+  "short_code": "kVOkZ",
+  "original_url": "https://example.com",
+  "created_at": "...",
+  "clicks": 21,
+  "last_clicked_at": "...",
+  "expires_at": "..."
+}
+```
+
+There is also a browser UI on `/` that covers all features.
+
+## How it works
+
+### The ID scrambling
+
+Instead of storing randomized strings, which wastes the 5-character space, or exposing sequential database IDs (1, 2,
+3...), the app scrambles the `BIGSERIAL` id with reversible modular arithmetic and base62:
 
 ```
-Auto-generated ID: 1 
-(scramble with large number operations)
+Auto-generated ID: 1
+(multiply by a large prime, mod MaxValue)
 687194767
 (convert to base62)
 kVOkZ
 ```
 
-This prevents people from guessing other URLs by incrementing the code. The scrambling is reversible, so `kVOkZ` always
-maps back to ID 1.
+A code can be easily translated back and from its ID without producing visibly adjacent codes.
 
-## API
+### Expiry
 
-Shorten URL:
+Links expire from disuse rather than fixed age. Creating or clicking a link resets its `expires_at` timestamp forward to
+`now() + URL_TTL`, so a link that keeps getting traffic stays alive and one that goes quiet dies.
 
-```bash
-curl -X POST http://localhost:8080/shorten \
-  -H "Content-Type: application/json" \
-  -d '{"originalUrl": "https://example.com"}'
-# Returns: {"shortCode": "kVOkZ"}
-```
+### Why no indexes
 
-Use short URL:
-
-```bash
-curl http://localhost:8080/kVOkZ
-# Redirects to https://example.com
-```
-
-Check stats:
-
-```bash
-curl http://localhost:8080/stats/kVOkZ
-# Returns: {
-#   "code": "kVOkZ",
-#   "originalUrl": "https://example.com",
-#   "clickCounter": 21,
-#   "createdAt": "2025-08-17T12:34:56Z",
-#   "lastClickedAt": "2025-08-17T12:34:56Z"
-# }
-```
-
-Auto-cleanup service removes unused URLs after 5 minutes since last usage (click or creation) for demonstration
-purposes.
-
-See `test.http` for example requests you can run directly.
+Because of the scrambling trick, the short code <u>is</u> the ID. The only index is the primary key, on a column that
+never changes, and that is what keeps clicks cheap. Postgres can only do an in-place HOT update when no indexed column
+changes. `expires_at` used to be indexed to speed up expiry checks, but since every click rewrites it, every click paid.
+Dropping that index took HOT updates from 7% to 99.96% and halved WAL per click from 277 bytes to 139.
 
 ## Tech stack
 
-- Java 21 + Spring Boot
-- Redis
-- Protocol Buffers
-- Prometheus + Grafana
+- Go standard library
+- Postgres + pgx
+- sqlc for handwritten SQL
+- goose for migrations
 - Docker Compose
-- JUnit 5 + AssertJ + Mockito
-
-## Technical choices and their impact on performance
-
-- Redis - used for O(1) lookups. Comes with free TTL functionality which replaced the manual scheduled cleanup
-  implementation. 5-10x speedup on all endpoints compared to SQLite
-- Protocol buffers - replaced JSON with binary serialization. Lowered CPU usage by 15% and reduced endpoint latency by
-  10-25%
-- Asynchronous stats updates - stats are updated asynchronously from the main redirection flow, speeding up the redirect
-  endpoint by 60-70%
-- And many more small optimizations, like enabling virtual threads, ~~pre-compiling regexes~~ replacing regexes with
-  direct char comparisons, etc. - 10-20% reduction in CPU usage and endpoint latency
-
-### Why protocol buffers
-
-| Data format      | Redirect endpoint latency @10kRPS load | Notes                                                                 |
-|------------------|----------------------------------------|-----------------------------------------------------------------------|
-| JSON             | 2.2-2.4ms                              | Default, simple implementation, but inefficient use of CPU and memory |
-| Protocol buffers | 1.9-2.0ms                              | Much more efficient use of system resources, but more complex setup   |
-| Raw KV pairs     | 1.6ms                                  | Fastest, but keeping track of all keys was becoming too complicated   |
-| Redis hashes     | 4.2ms                                  | Easier to manage than raw KV pairs, but way too slow                  |
-
-I chose Protocol buffers because despite the setup complexity, the code is simple and readable, while still being
-much more efficient than JSON. Keeping track of all KV pairs and their TTLs manually was becoming too complicated, so I
-decided not to use them even though the performance would benefit. I tried using hashes, but they turned out to be the
-slowest in testing.
-
-### Was it worth it
-
-I'm well aware that this project is over-engineered for a URL shortener. The goal was a performance optimization
-deep-dive on a simple domain. If it were a production system, I would stick with just the bigger wins like Redis and
-async stat updates, and keep JSON for simplicity.
-
-![Dashboard screenshot](grafana/dashboard.webp)
-Screenshot of the Grafana dashboard during load testing
