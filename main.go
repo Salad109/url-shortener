@@ -17,6 +17,8 @@ import (
 //go:embed db/migrations/*.sql
 var migrations embed.FS
 
+const maxHeaderBytes = 8 << 10
+
 func main() {
 	cfg, err := loadConfig()
 	if err != nil {
@@ -48,11 +50,12 @@ func main() {
 	handler := http.TimeoutHandler(srv.routes(), cfg.requestTimeout, "Server is busy, try again shortly")
 
 	httpServer := &http.Server{
-		Addr:         ":8080",
-		Handler:      handler,
-		ReadTimeout:  cfg.requestTimeout,
-		WriteTimeout: cfg.requestTimeout + time.Second,
-		IdleTimeout:  60 * time.Second,
+		Addr:           ":8080",
+		Handler:        handler,
+		ReadTimeout:    cfg.requestTimeout,
+		WriteTimeout:   cfg.requestTimeout + time.Second,
+		IdleTimeout:    60 * time.Second,
+		MaxHeaderBytes: maxHeaderBytes,
 	}
 	log.Fatal(httpServer.ListenAndServe())
 }

@@ -27,6 +27,9 @@ var errorPage []byte
 //go:embed static/app.css
 var styleSheet []byte
 
+// maxRequestBytes prevents accepting comically large URLs.
+const maxRequestBytes = 2048
+
 // server holds the dependencies shared by every handler.
 type server struct {
 	queries    *db.Queries
@@ -126,17 +129,24 @@ func (s *server) handleRedirect(w http.ResponseWriter, r *http.Request) {
 func (s *server) handleCreate(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBytes)
+
 	var req CreateUrlRequest
 
 	// Parse request body
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			writeError(w, http.StatusRequestEntityTooLarge, "Request body too large")
+			return
+		}
 		writeError(w, http.StatusBadRequest, "Invalid JSON")
 		return
 	}
 
 	// Validate URL input
 	u, err := url.Parse(req.OriginalURL)
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || len(req.OriginalURL) > 2048 {
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		writeError(w, http.StatusBadRequest, "Invalid URL")
 		return
 	}
