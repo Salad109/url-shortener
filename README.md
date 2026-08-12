@@ -92,12 +92,29 @@ A code can be easily translated back and from its ID without producing visibly a
 Links expire from disuse rather than fixed age. Creating or clicking a link resets its `expires_at` timestamp forward to
 `now() + URL_TTL`, so a link that keeps getting traffic stays alive and one that goes quiet dies.
 
-### Why no indexes
+## Optimizations
 
-Because of the scrambling trick, the short code <u>is</u> the ID. The only index is the primary key, on a column that
-never changes, and that is what keeps clicks cheap. Postgres can only do an in-place HOT update when no indexed column
-changes. `expires_at` used to be indexed to speed up expiry checks, but since every click rewrites it, every click paid.
-Dropping that index took HOT updates from 7% to 99.96% and halved WAL per click from 277 bytes to 139.
+**No index except the primary key** - the scrambling trick makes the short code the ID, so the only index needed is the
+primary key, on a column that never changes. Postgres can only do an in-place HOT update when no indexed column changes,
+and every click rewrites `expires_at`, which used to be indexed to speed up expiry checks. Dropping it took HOT updates
+from 0% to ~99% and WAL per click from ~380 B to ~200 B. Measured:
+
+| Redirects/s | p50 indexless | p50 indexed | p95 indexless | p95 indexed |
+|-------------|---------------|-------------|---------------|-------------|
+| 5,000       | 1.30 ms       | 1.31 ms     | 1.53 ms       | 1.53 ms     |
+| 15,000      | 1.40 ms       | 1.43 ms     | 2.19 ms       | 3.25 ms     |
+| 20,000      | 1.44 ms       | 1.52 ms     | 3.74 ms       | 5.54 ms     |
+| 25,000      | 1.63 ms       | 1.78 ms     | 18.68 ms      | 36.23 ms    |
+| 30,000      | 29.49 ms      | 129.48 ms   | 91.19 ms      | 152.20 ms   |
+
+Below 15k RPS they are indistinguishable, so under light load the index is free. Where it actually costs is in the
+headroom: at 30k RPS the indexless build degrades to 29 ms, while the indexed one degrades to 129 ms.
+
+**Soft expiry before deletion** - every read carries `AND expires_at > now()`, so a link appears dead on time, no matter
+when the scheduled deletion sweep runs.
+
+**One statement per click** - `ProcessClick` increments the counter, stamps `last_clicked_at`, pushes `expires_at`
+forward and returns the URL all in a single query.
 
 ## Tech stack
 
