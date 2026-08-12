@@ -162,7 +162,13 @@ func (s *server) handleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Encode ID into the short code
-	shortCode := transcoding.Encode(row.ID)
+	shortCode, err := transcoding.Encode(row.ID)
+	if err != nil {
+		log.Println("Short code space exhausted:", err)
+		writeError(w, http.StatusServiceUnavailable, "Failed to create short URL")
+		return
+	}
+
 	resp := CreateUrlResponse{
 		ShortCode: shortCode,
 		ShortURL:  s.baseUrl + "/" + shortCode,

@@ -1,15 +1,25 @@
 package transcoding
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 // MaxCodeLength is the longest code Encode can produce, since MaxValue is 62^5 - 1.
 const MaxCodeLength = 5
 
+// MaxID is the largest distinct ID that can be encoded into a short code
+const MaxID = MaxValue - 1
+
 // Encode takes a sequentially-generated ID and obfuscates it into a base62 string
-func Encode(id int64) string {
+func Encode(id int64) (string, error) {
+	if id < 1 || id > MaxID {
+		return "", fmt.Errorf("id %d is outside [1, %d]", id, MaxID)
+	}
+
 	scrambled := Scramble(id)
 	encoded := EncodeBase62(scrambled)
-	return encoded
+	return encoded, nil
 }
 
 // Decode takes the obfuscated short code string and decodes it into the sequential ID
