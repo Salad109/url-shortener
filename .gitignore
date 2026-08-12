@@ -16,4 +16,7 @@
 ### VS Code ###
 .vscode/
 
-/loadtest/results/
+### Local
+CLAUDE.md
+/stuff/
+/loadtest/
