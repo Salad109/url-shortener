@@ -1,4 +1,4 @@
-module url-shortener
+module github.com/Salad109/url-shortener
 
 go 1.26
 

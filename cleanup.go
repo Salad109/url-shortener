@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	db "url-shortener/db/generated"
+	db "github.com/Salad109/url-shortener/db/generated"
 )
 
 const cleanupBatchSize = 1000

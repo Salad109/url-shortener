@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	db "url-shortener/db/generated"
+	db "github.com/Salad109/url-shortener/db/generated"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"

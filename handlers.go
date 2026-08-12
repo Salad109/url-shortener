@@ -7,9 +7,9 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"url-shortener/transcoding"
 
-	db "url-shortener/db/generated"
+	db "github.com/Salad109/url-shortener/db/generated"
+	"github.com/Salad109/url-shortener/transcoding"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
