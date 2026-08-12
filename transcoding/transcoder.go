@@ -17,6 +17,12 @@ func Decode(encoded string) (int64, error) {
 	if len(encoded) > MaxCodeLength {
 		return 0, errors.New("short code is too long")
 	}
+	if encoded == "" {
+		return 0, errors.New("short code is empty")
+	}
+	if encoded[0] == '0' {
+		return 0, errors.New("short code has a leading zero")
+	}
 
 	decoded, err := DecodeBase62(encoded)
 	if err != nil {
