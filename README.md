@@ -92,6 +92,24 @@ A code can be easily translated back and from its ID without producing visibly a
 Links expire from disuse rather than fixed age. Creating or clicking a link resets its `expires_at` timestamp forward to
 `now() + URL_TTL`, so a link that keeps getting traffic stays alive and one that goes quiet dies.
 
+### Capacity
+
+The 5-character Base62 space holds 916,132,830 links, which is every value the scrambler can produce.
+
+Five characters is also the most a 64-bit multiply can handle. `Scramble` computes `id * LargePrime` before reducing it
+mod `MaxValue`, and that intermediate has to fit in an `int64`, which requires `MaxValue^2 < 2^63`. Past it the multiply
+overflows and `Encode` hands back an empty string.
+
+Widening the space is a relatively straightforward change. It just needs a 128-bit intermediate and a new set of primes.
+
+| Code length | Capacity          | Scramble             |
+|-------------|-------------------|----------------------|
+| 5 (current) | 916,132,830       | bare int64           |
+| 6           | 56,800,235,582    | 128-bit intermediate |
+| 7           | 3,521,614,606,206 | 128-bit intermediate |
+
+916 million is plenty for now.
+
 ## Optimizations
 
 **No index except the primary key** - the scrambling trick makes the short code the ID, so the only index needed is the
