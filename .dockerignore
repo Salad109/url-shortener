@@ -1,5 +1,7 @@
 .git
+.github
 .gitignore
+.golangci.yml
 .idea
 .vscode
 .env
