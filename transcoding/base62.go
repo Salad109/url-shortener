@@ -2,8 +2,10 @@ package transcoding
 
 import "errors"
 
-const Alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-const Base = int64(len(Alphabet))
+const (
+	Alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+	Base     = int64(len(Alphabet))
+)
 
 func EncodeBase62(id int64) string {
 	encoded := ""
