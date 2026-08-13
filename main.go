@@ -27,7 +27,7 @@ func main() {
 
 	ctx := context.Background()
 
-	pool, err := pgxpool.New(ctx, cfg.databaseUrl)
+	pool, err := pgxpool.New(ctx, cfg.databaseURL)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -37,14 +37,14 @@ func main() {
 
 	queries := db.New(pool)
 
-	srv := &server{queries: queries, baseUrl: cfg.baseUrl, ttlSeconds: cfg.ttlSeconds()}
+	srv := &server{queries: queries, baseURL: cfg.baseURL, ttlSeconds: cfg.ttlSeconds()}
 
 	go runCleanup(ctx, queries, cfg.cleanupInterval)
 
-	log.Println("URL TTL is", cfg.urlTtl)
+	log.Println("URL TTL is", cfg.urlTTL)
 	log.Println("Expired URLs are deleted every", cfg.cleanupInterval)
 	log.Println("Request timeout is", cfg.requestTimeout)
-	log.Println("Base URL is", cfg.baseUrl)
+	log.Println("Base URL is", cfg.baseURL)
 	log.Println("Server is running on port 8080")
 
 	handler := http.TimeoutHandler(srv.routes(), cfg.requestTimeout, "Server is busy, try again shortly")

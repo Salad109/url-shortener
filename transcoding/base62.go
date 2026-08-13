@@ -1,6 +1,6 @@
 package transcoding
 
-import "fmt"
+import "errors"
 
 const Alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 const Base = int64(len(Alphabet))
@@ -27,7 +27,7 @@ func DecodeBase62(encoded string) (int64, error) {
 			}
 		}
 		if index == -1 {
-			return 0, fmt.Errorf("invalid character in Base62 string")
+			return 0, errors.New("invalid character in Base62 string")
 		}
 		decoded = decoded*Base + index
 	}

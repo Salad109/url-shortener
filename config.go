@@ -12,42 +12,42 @@ import (
 
 // config holds every setting the app reads from the environment variables.
 type config struct {
-	databaseUrl     string
-	baseUrl         string
-	urlTtl          time.Duration
+	databaseURL     string
+	baseURL         string
+	urlTTL          time.Duration
 	cleanupInterval time.Duration
 	requestTimeout  time.Duration
 }
 
 // loadConfig reads and validates all environment variables.
 func loadConfig() (config, error) {
-	var dbErr, baseUrlErr, ttlErr, cleanupErr, timeoutErr error
+	var dbErr, baseURLErr, ttlErr, cleanupErr, timeoutErr error
 
-	cfg := config{databaseUrl: os.Getenv("DATABASE_URL")}
-	if cfg.databaseUrl == "" {
+	cfg := config{databaseURL: os.Getenv("DATABASE_URL")}
+	if cfg.databaseURL == "" {
 		dbErr = errors.New("DATABASE_URL is not set")
 	}
 
-	cfg.baseUrl, baseUrlErr = envUrl("BASE_URL", "http://localhost:8080")
+	cfg.baseURL, baseURLErr = envURL("BASE_URL", "http://localhost:8080")
 
-	cfg.urlTtl, ttlErr = envDuration("URL_TTL", 5*time.Minute)
-	if ttlErr == nil && (cfg.urlTtl < time.Second || cfg.urlTtl.Seconds() > math.MaxInt32) {
-		ttlErr = fmt.Errorf("URL_TTL: %s must be between 1s and about 68 years", cfg.urlTtl)
+	cfg.urlTTL, ttlErr = envDuration("URL_TTL", 5*time.Minute)
+	if ttlErr == nil && (cfg.urlTTL < time.Second || cfg.urlTTL.Seconds() > math.MaxInt32) {
+		ttlErr = fmt.Errorf("URL_TTL: %s must be between 1s and about 68 years", cfg.urlTTL)
 	}
 
 	cfg.cleanupInterval, cleanupErr = envDuration("CLEANUP_INTERVAL", time.Minute)
 
 	cfg.requestTimeout, timeoutErr = envDuration("REQUEST_TIMEOUT", 5*time.Second)
 
-	return cfg, errors.Join(dbErr, baseUrlErr, ttlErr, cleanupErr, timeoutErr)
+	return cfg, errors.Join(dbErr, baseURLErr, ttlErr, cleanupErr, timeoutErr)
 }
 
 func (c config) ttlSeconds() int32 {
-	return int32(c.urlTtl.Seconds())
+	return int32(c.urlTTL.Seconds())
 }
 
-// envUrl reads an absolute http(s) url with no trailing slash.
-func envUrl(key, fallback string) (string, error) {
+// envURL reads an absolute http(s) url with no trailing slash.
+func envURL(key, fallback string) (string, error) {
 	value := os.Getenv(key)
 	if value == "" {
 		value = fallback

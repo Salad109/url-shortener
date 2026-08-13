@@ -33,7 +33,7 @@ const maxRequestBytes = 2048
 // server holds the dependencies shared by every handler.
 type server struct {
 	queries    *db.Queries
-	baseUrl    string
+	baseURL    string
 	ttlSeconds int32
 }
 
@@ -110,7 +110,7 @@ func (s *server) handleRedirect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Record the click, extend the TTL and fetch the original URL
-	originalUrl, err := s.queries.ProcessClick(ctx, db.ProcessClickParams{ID: id, TtlSeconds: s.ttlSeconds})
+	originalURL, err := s.queries.ProcessClick(ctx, db.ProcessClickParams{ID: id, TtlSeconds: s.ttlSeconds})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			s.handleNotFound(w, r)
@@ -123,7 +123,7 @@ func (s *server) handleRedirect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, originalUrl, http.StatusFound)
+	http.Redirect(w, r, originalURL, http.StatusFound)
 }
 
 func (s *server) handleCreate(w http.ResponseWriter, r *http.Request) {
@@ -131,7 +131,7 @@ func (s *server) handleCreate(w http.ResponseWriter, r *http.Request) {
 
 	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBytes)
 
-	var req CreateUrlRequest
+	var req CreateURLRequest
 
 	// Parse request body
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -169,20 +169,20 @@ func (s *server) handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := CreateUrlResponse{
+	resp := CreateURLResponse{
 		ShortCode: shortCode,
-		ShortURL:  s.baseUrl + "/" + shortCode,
+		ShortURL:  s.baseURL + "/" + shortCode,
 		ExpiresAt: row.ExpiresAt,
 	}
 
 	writeJSON(w, http.StatusCreated, resp)
 }
 
-type CreateUrlRequest struct {
+type CreateURLRequest struct {
 	OriginalURL string `json:"original_url"`
 }
 
-type CreateUrlResponse struct {
+type CreateURLResponse struct {
 	ShortCode string             `json:"short_code"`
 	ShortURL  string             `json:"short_url"`
 	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
