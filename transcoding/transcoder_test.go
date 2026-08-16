@@ -8,7 +8,7 @@ func TestRoundTrip(t *testing.T) {
 	for _, id := range ids {
 		encoded, err := Encode(id)
 		if err != nil {
-			t.Errorf("Encode(%d): %v", id, err)
+			t.Errorf("Encode(%d): %s", id, err)
 			continue
 		}
 		if len(encoded) > MaxCodeLength {
@@ -17,7 +17,7 @@ func TestRoundTrip(t *testing.T) {
 
 		decoded, err := Decode(encoded)
 		if err != nil {
-			t.Errorf("Decode(%q) from id %d: %v", encoded, id, err)
+			t.Errorf("Decode(%q) from id %d: %s", encoded, id, err)
 			continue
 		}
 		if decoded != id {
@@ -32,7 +32,7 @@ func TestEncodeIsDistinct(t *testing.T) {
 	for id := int64(1); id <= 1000; id++ {
 		encoded, err := Encode(id)
 		if err != nil {
-			t.Fatalf("Encode(%d): %v", id, err)
+			t.Fatalf("Encode(%d): %s", id, err)
 		}
 		if other, ok := seen[encoded]; ok {
 			t.Fatalf("Encode(%d) = Encode(%d) = %q", id, other, encoded)
@@ -53,7 +53,7 @@ func FuzzEncodeThenDecode(f *testing.F) {
 
 		encoded, err := Encode(id)
 		if err != nil {
-			t.Fatalf("Encode(%d): %v", id, err)
+			t.Fatalf("Encode(%d): %s", id, err)
 		}
 		if len(encoded) > MaxCodeLength {
 			t.Fatalf("Encode(%d) = %q, longer than %d characters", id, encoded, MaxCodeLength)
@@ -61,7 +61,7 @@ func FuzzEncodeThenDecode(f *testing.F) {
 
 		decoded, err := Decode(encoded)
 		if err != nil {
-			t.Fatalf("Decode(%q) from id %d: %v", encoded, id, err)
+			t.Fatalf("Decode(%q) from id %d: %s", encoded, id, err)
 		}
 		if decoded != id {
 			t.Errorf("Decode(Encode(%d)) = %d, want %d", id, decoded, id)
@@ -81,7 +81,7 @@ func FuzzDecodeThenEncode(f *testing.F) {
 
 		got, err := Encode(id)
 		if err != nil {
-			t.Fatalf("Decode(%q) = %d, which Encode rejects: %v", code, id, err)
+			t.Fatalf("Decode(%q) = %d, which Encode rejects: %s", code, id, err)
 		}
 		if got != code {
 			t.Errorf("Decode(%q) = %d, which re-encodes to %q", code, id, got)
@@ -92,10 +92,13 @@ func FuzzDecodeThenEncode(f *testing.F) {
 func TestIDCeiling(t *testing.T) {
 	encoded, err := Encode(MaxID)
 	if err != nil {
-		t.Fatalf("Encode(MaxID): %v", err)
+		t.Fatalf("Encode(MaxID): %s", err)
 	}
-	if decoded, err := Decode(encoded); err != nil || decoded != MaxID {
-		t.Errorf("Encode(MaxID) round trips to %d, %v, want %d and no error", decoded, err, MaxID)
+	decoded, err := Decode(encoded)
+	if err != nil {
+		t.Errorf("Decode(%q) from MaxID: %s", encoded, err)
+	} else if decoded != MaxID {
+		t.Errorf("Decode(%q) = %d, want %d", encoded, decoded, MaxID)
 	}
 
 	for _, id := range []int64{0, -1, MaxID + 1, MaxID + 2} {
