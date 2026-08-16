@@ -17,7 +17,10 @@ import (
 //go:embed db/migrations/*.sql
 var migrations embed.FS
 
-const maxHeaderBytes = 8 << 10
+const (
+	maxHeaderBytes = 8 << 10
+	listenAddr     = ":8080"
+)
 
 func main() {
 	cfg, err := loadConfig()
@@ -37,7 +40,7 @@ func main() {
 
 	queries := db.New(pool)
 
-	srv := &server{queries: queries, baseURL: cfg.baseURL, ttlSeconds: cfg.ttlSeconds()}
+	s := &shortener{queries: queries, baseURL: cfg.baseURL, ttlSeconds: cfg.ttlSeconds()}
 
 	go runCleanup(ctx, queries, cfg.cleanupInterval)
 
@@ -45,19 +48,21 @@ func main() {
 	log.Println("Expired URLs are deleted every", cfg.cleanupInterval)
 	log.Println("Request timeout is", cfg.requestTimeout)
 	log.Println("Base URL is", cfg.baseURL)
-	log.Println("Server is running on port 8080")
+	log.Println("Server is running on", listenAddr)
 
-	handler := http.TimeoutHandler(srv.routes(), cfg.requestTimeout, "Server is busy, try again shortly")
+	log.Fatal(newHTTPServer(s.routes(), cfg.requestTimeout).ListenAndServe())
+}
 
-	httpServer := &http.Server{
-		Addr:           ":8080",
-		Handler:        handler,
-		ReadTimeout:    cfg.requestTimeout,
-		WriteTimeout:   cfg.requestTimeout + time.Second,
+// newHTTPServer wraps handler in the request timeout and applies the transport limits.
+func newHTTPServer(handler http.Handler, timeout time.Duration) *http.Server {
+	return &http.Server{
+		Addr:           listenAddr,
+		Handler:        http.TimeoutHandler(handler, timeout, "Server is busy, try again shortly"),
+		ReadTimeout:    timeout,
+		WriteTimeout:   timeout + time.Second,
 		IdleTimeout:    60 * time.Second,
 		MaxHeaderBytes: maxHeaderBytes,
 	}
-	log.Fatal(httpServer.ListenAndServe())
 }
 
 func runMigrations(ctx context.Context, pool *pgxpool.Pool) {

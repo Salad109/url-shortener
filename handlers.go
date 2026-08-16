@@ -30,14 +30,14 @@ var styleSheet []byte
 // maxRequestBytes prevents accepting comically large URLs.
 const maxRequestBytes = 2048
 
-// server holds the dependencies shared by every handler.
-type server struct {
+// shortener holds the dependencies shared by every handler.
+type shortener struct {
 	queries    *db.Queries
 	baseURL    string
 	ttlSeconds int32
 }
 
-func (s *server) routes() http.Handler {
+func (s *shortener) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.handleIndex)
 	mux.HandleFunc("GET /static/app.css", s.handleStyles)
@@ -58,12 +58,12 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	}
 }
 
-func writeError(w http.ResponseWriter, status int, message string) {
-	writeJSON(w, status, ErrorResponse{Error: message})
-}
-
 type ErrorResponse struct {
 	Error string `json:"error"`
+}
+
+func writeError(w http.ResponseWriter, status int, message string) {
+	writeJSON(w, status, ErrorResponse{Error: message})
 }
 
 // writeHTML sends an embedded page to a browser-facing route.
@@ -75,30 +75,30 @@ func writeHTML(w http.ResponseWriter, status int, page []byte) {
 	}
 }
 
-func (s *server) handleIndex(w http.ResponseWriter, _ *http.Request) {
+func (s *shortener) handleIndex(w http.ResponseWriter, _ *http.Request) {
 	writeHTML(w, http.StatusOK, indexPage)
 }
 
-func (s *server) handleStyles(w http.ResponseWriter, _ *http.Request) {
+func (s *shortener) handleStyles(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/css; charset=utf-8")
 	if _, err := w.Write(styleSheet); err != nil {
 		log.Println("Failed to write response:", err)
 	}
 }
 
-func (s *server) handleNotFound(w http.ResponseWriter, _ *http.Request) {
+func (s *shortener) handleNotFound(w http.ResponseWriter, _ *http.Request) {
 	writeHTML(w, http.StatusNotFound, notFoundPage)
-}
-
-func (s *server) handleHealth(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, HealthResponse{Status: "ok"})
 }
 
 type HealthResponse struct {
 	Status string `json:"status"`
 }
 
-func (s *server) handleRedirect(w http.ResponseWriter, r *http.Request) {
+func (s *shortener) handleHealth(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, HealthResponse{Status: "ok"})
+}
+
+func (s *shortener) handleRedirect(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	shortCode := r.PathValue("shortCode")
 
@@ -126,7 +126,17 @@ func (s *server) handleRedirect(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, originalURL, http.StatusFound)
 }
 
-func (s *server) handleCreate(w http.ResponseWriter, r *http.Request) {
+type CreateURLRequest struct {
+	OriginalURL string `json:"original_url"`
+}
+
+type CreateURLResponse struct {
+	ShortCode string             `json:"short_code"`
+	ShortURL  string             `json:"short_url"`
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
+}
+
+func (s *shortener) handleCreate(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBytes)
@@ -178,17 +188,16 @@ func (s *server) handleCreate(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, resp)
 }
 
-type CreateURLRequest struct {
-	OriginalURL string `json:"original_url"`
+type GetStatsResponse struct {
+	ShortCode     string             `json:"short_code"`
+	OriginalURL   string             `json:"original_url"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	Clicks        int64              `json:"clicks"`
+	LastClickedAt pgtype.Timestamptz `json:"last_clicked_at"`
+	ExpiresAt     pgtype.Timestamptz `json:"expires_at"`
 }
 
-type CreateURLResponse struct {
-	ShortCode string             `json:"short_code"`
-	ShortURL  string             `json:"short_url"`
-	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
-}
-
-func (s *server) handleStats(w http.ResponseWriter, r *http.Request) {
+func (s *shortener) handleStats(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	shortCode := r.PathValue("shortCode")
 
@@ -221,13 +230,4 @@ func (s *server) handleStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, resp)
-}
-
-type GetStatsResponse struct {
-	ShortCode     string             `json:"short_code"`
-	OriginalURL   string             `json:"original_url"`
-	CreatedAt     pgtype.Timestamptz `json:"created_at"`
-	Clicks        int64              `json:"clicks"`
-	LastClickedAt pgtype.Timestamptz `json:"last_clicked_at"`
-	ExpiresAt     pgtype.Timestamptz `json:"expires_at"`
 }
