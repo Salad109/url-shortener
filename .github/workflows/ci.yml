@@ -56,3 +56,25 @@ jobs:
         with:
           sqlc-version: '1.31.1'
       - run: sqlc diff
+
+  smoke:
+    name: Stack boots and redirects
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Write .env
+        run: |
+          cp .env.example .env
+          sed -i 's/^POSTGRES_PASSWORD=$/POSTGRES_PASSWORD=ci-not-a-secret/' .env
+      - run: docker compose up -d --build --wait
+      - name: Shorten a /health URL and follow it
+        run: |
+          created=$(curl -sS -X POST http://localhost:8080/create \
+            -H 'Content-Type: application/json' \
+            -d '{"original_url":"http://localhost:8080/health"}')
+          echo "$created"
+          code=$(echo "$created" | jq -re .short_code)
+          curl -sS -L "http://localhost:8080/$code" | jq -e '.status == "ok"'
+      - name: App logs
+        if: failure()
+        run: docker compose logs app
