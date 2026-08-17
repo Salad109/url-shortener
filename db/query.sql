@@ -1,4 +1,4 @@
--- name: AddUrl :one
+-- name: AddURL :one
 INSERT INTO urls (original_url, expires_at)
 VALUES ($1, now() + (sqlc.arg(ttl_seconds)::int * INTERVAL '1 second')) RETURNING *;
 
@@ -10,13 +10,13 @@ SET click_count     = click_count + 1,
 WHERE id = sqlc.arg(id)
   AND expires_at > now() RETURNING original_url;
 
--- name: GetStatsById :one
+-- name: GetStatsByID :one
 SELECT *
 FROM urls
 WHERE id = $1
   AND expires_at > now();
 
--- name: DeleteExpiredUrls :execrows
+-- name: DeleteExpiredURLs :execrows
 DELETE
 FROM urls USING (SELECT id
                  FROM urls

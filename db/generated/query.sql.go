@@ -9,22 +9,22 @@ import (
 	"context"
 )
 
-const addUrl = `-- name: AddUrl :one
+const addURL = `-- name: AddURL :one
 INSERT INTO urls (original_url, expires_at)
 VALUES ($1, now() + ($2::int * INTERVAL '1 second')) RETURNING id, original_url, created_at, click_count, last_clicked_at, expires_at
 `
 
-type AddUrlParams struct {
-	OriginalUrl string
-	TtlSeconds  int32
+type AddURLParams struct {
+	OriginalURL string
+	TTLSeconds  int32
 }
 
-func (q *Queries) AddUrl(ctx context.Context, arg AddUrlParams) (Url, error) {
-	row := q.db.QueryRow(ctx, addUrl, arg.OriginalUrl, arg.TtlSeconds)
-	var i Url
+func (q *Queries) AddURL(ctx context.Context, arg AddURLParams) (URL, error) {
+	row := q.db.QueryRow(ctx, addURL, arg.OriginalURL, arg.TTLSeconds)
+	var i URL
 	err := row.Scan(
 		&i.ID,
-		&i.OriginalUrl,
+		&i.OriginalURL,
 		&i.CreatedAt,
 		&i.ClickCount,
 		&i.LastClickedAt,
@@ -33,7 +33,7 @@ func (q *Queries) AddUrl(ctx context.Context, arg AddUrlParams) (Url, error) {
 	return i, err
 }
 
-const deleteExpiredUrls = `-- name: DeleteExpiredUrls :execrows
+const deleteExpiredURLs = `-- name: DeleteExpiredURLs :execrows
 DELETE
 FROM urls USING (SELECT id
                  FROM urls
@@ -42,27 +42,27 @@ FROM urls USING (SELECT id
 WHERE urls.id = expired.id
 `
 
-func (q *Queries) DeleteExpiredUrls(ctx context.Context, limit int32) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteExpiredUrls, limit)
+func (q *Queries) DeleteExpiredURLs(ctx context.Context, limit int32) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteExpiredURLs, limit)
 	if err != nil {
 		return 0, err
 	}
 	return result.RowsAffected(), nil
 }
 
-const getStatsById = `-- name: GetStatsById :one
+const getStatsByID = `-- name: GetStatsByID :one
 SELECT id, original_url, created_at, click_count, last_clicked_at, expires_at
 FROM urls
 WHERE id = $1
   AND expires_at > now()
 `
 
-func (q *Queries) GetStatsById(ctx context.Context, id int64) (Url, error) {
-	row := q.db.QueryRow(ctx, getStatsById, id)
-	var i Url
+func (q *Queries) GetStatsByID(ctx context.Context, id int64) (URL, error) {
+	row := q.db.QueryRow(ctx, getStatsByID, id)
+	var i URL
 	err := row.Scan(
 		&i.ID,
-		&i.OriginalUrl,
+		&i.OriginalURL,
 		&i.CreatedAt,
 		&i.ClickCount,
 		&i.LastClickedAt,
@@ -81,12 +81,12 @@ WHERE id = $2
 `
 
 type ProcessClickParams struct {
-	TtlSeconds int32
+	TTLSeconds int32
 	ID         int64
 }
 
 func (q *Queries) ProcessClick(ctx context.Context, arg ProcessClickParams) (string, error) {
-	row := q.db.QueryRow(ctx, processClick, arg.TtlSeconds, arg.ID)
+	row := q.db.QueryRow(ctx, processClick, arg.TTLSeconds, arg.ID)
 	var original_url string
 	err := row.Scan(&original_url)
 	return original_url, err

@@ -23,7 +23,7 @@ func runCleanup(ctx context.Context, queries *db.Queries, interval time.Duration
 // deleteExpired removes expired URLs in batches until none are left.
 func deleteExpired(ctx context.Context, queries *db.Queries) {
 	for {
-		deleted, err := queries.DeleteExpiredUrls(ctx, cleanupBatchSize)
+		deleted, err := queries.DeleteExpiredURLs(ctx, cleanupBatchSize)
 		if err != nil {
 			log.Println("Failed to delete expired URLs:", err)
 			return

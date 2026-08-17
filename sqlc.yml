@@ -8,3 +8,4 @@ sql:
         package: "generated"
         out: "db/generated"
         sql_package: "pgx/v5"
+        initialisms: [ "id", "url", "ttl" ]

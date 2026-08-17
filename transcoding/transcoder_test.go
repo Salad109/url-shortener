@@ -109,22 +109,25 @@ func TestIDCeiling(t *testing.T) {
 }
 
 func TestDecodeRejectsBadCodes(t *testing.T) {
-	cases := map[string]string{
-		"too long":     "abcdef",
-		"invalid char": "ab!de",
-		"out of range": "zzzzz",
-		"non-ascii":    "abcó",
-		"empty":        "",
-		"leading zero": "0AB",
-		"all zeroes":   "00000",
-		"chinese":      "豆子",
-		"emoji":        "🥺",
-		"space":        "AB CD",
+	cases := []struct {
+		name string
+		code string
+	}{
+		{name: "too long", code: "abcdef"},
+		{name: "invalid char", code: "ab!de"},
+		{name: "out of range", code: "zzzzz"},
+		{name: "non-ascii", code: "abcó"},
+		{name: "empty", code: ""},
+		{name: "leading zero", code: "0AB"},
+		{name: "all zeroes", code: "00000"},
+		{name: "chinese", code: "豆子"},
+		{name: "emoji", code: "🥺"},
+		{name: "space", code: "AB CD"},
 	}
 
-	for name, code := range cases {
-		if _, err := Decode(code); err == nil {
-			t.Errorf("Decode(%q) (%s) returned no error", code, name)
+	for _, c := range cases {
+		if _, err := Decode(c.code); err == nil {
+			t.Errorf("Decode(%q) (%s) returned no error", c.code, c.name)
 		}
 	}
 }

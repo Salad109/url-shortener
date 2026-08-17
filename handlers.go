@@ -110,14 +110,14 @@ func (s *shortener) handleRedirect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Record the click, extend the TTL and fetch the original URL
-	originalURL, err := s.queries.ProcessClick(ctx, db.ProcessClickParams{ID: id, TtlSeconds: s.ttlSeconds})
+	originalURL, err := s.queries.ProcessClick(ctx, db.ProcessClickParams{ID: id, TTLSeconds: s.ttlSeconds})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			s.handleNotFound(w, r)
 			return
 		}
 		if ctx.Err() == nil {
-			log.Println("Failed to look up", shortCode, err)
+			log.Printf("Failed to look up %q: %s", shortCode, err)
 		}
 		writeHTML(w, http.StatusInternalServerError, errorPage)
 		return
@@ -162,10 +162,10 @@ func (s *shortener) handleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Insert URL into the database
-	row, err := s.queries.AddUrl(ctx, db.AddUrlParams{OriginalUrl: req.OriginalURL, TtlSeconds: s.ttlSeconds})
+	row, err := s.queries.AddURL(ctx, db.AddURLParams{OriginalURL: req.OriginalURL, TTLSeconds: s.ttlSeconds})
 	if err != nil {
 		if ctx.Err() == nil {
-			log.Println("Failed to shorten", req.OriginalURL, err)
+			log.Printf("Failed to shorten %q: %s", req.OriginalURL, err)
 		}
 		writeError(w, http.StatusInternalServerError, "Failed to create short URL")
 		return
@@ -207,14 +207,14 @@ func (s *shortener) handleStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	row, err := s.queries.GetStatsById(ctx, id)
+	row, err := s.queries.GetStatsByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "URL not found")
 			return
 		}
 		if ctx.Err() == nil {
-			log.Println("Failed to retrieve stats for", shortCode, err)
+			log.Printf("Failed to retrieve stats for %q: %s", shortCode, err)
 		}
 		writeError(w, http.StatusInternalServerError, "Failed to retrieve stats")
 		return
@@ -222,7 +222,7 @@ func (s *shortener) handleStats(w http.ResponseWriter, r *http.Request) {
 
 	resp := GetStatsResponse{
 		ShortCode:     shortCode,
-		OriginalURL:   row.OriginalUrl,
+		OriginalURL:   row.OriginalURL,
 		CreatedAt:     row.CreatedAt,
 		Clicks:        row.ClickCount,
 		LastClickedAt: row.LastClickedAt,

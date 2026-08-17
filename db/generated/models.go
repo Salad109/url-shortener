@@ -8,9 +8,9 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type Url struct {
+type URL struct {
 	ID            int64
-	OriginalUrl   string
+	OriginalURL   string
 	CreatedAt     pgtype.Timestamptz
 	ClickCount    int64
 	LastClickedAt pgtype.Timestamptz
