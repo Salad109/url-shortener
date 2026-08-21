@@ -9,6 +9,7 @@ import (
 
 	db "github.com/Salad109/url-shortener/db/generated"
 
+	"github.com/dgraph-io/ristretto/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
@@ -40,7 +41,17 @@ func main() {
 
 	queries := db.New(pool)
 
-	s := &shortener{queries: queries, baseURL: cfg.baseURL, ttlSeconds: cfg.ttlSeconds()}
+	cache, err := ristretto.NewCache(&ristretto.Config[string, string]{
+		NumCounters: cfg.cacheSize / 100 * 10, // items 100 bytes on average, multiplied 10x
+		MaxCost:     cfg.cacheSize,
+		BufferItems: 64,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer cache.Close()
+
+	s := &shortener{queries: queries, baseURL: cfg.baseURL, ttlSeconds: cfg.ttlSeconds(), cache: cache}
 
 	go runCleanup(ctx, queries, cfg.cleanupInterval)
 
@@ -48,6 +59,7 @@ func main() {
 	log.Println("Expired URLs are deleted every", cfg.cleanupInterval)
 	log.Println("Request timeout is", cfg.requestTimeout)
 	log.Println("Base URL is", cfg.baseURL)
+	log.Println("Cache size is", cfg.cacheSize)
 	log.Println("Server is running on", listenAddr)
 
 	log.Fatal(newHTTPServer(s.routes(), cfg.requestTimeout).ListenAndServe())

@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/Salad109/url-shortener/transcoding"
+
+	"github.com/dgraph-io/ristretto/v2"
 )
 
 // click requests shortCode and fails the test unless it returns 302.
@@ -270,5 +272,82 @@ func TestStaticRoutes(t *testing.T) {
 			rec := serve(h, http.MethodGet, tt.target, "")
 			checkResponse(t, rec, tt.status, tt.contentType, tt.contains)
 		})
+	}
+}
+
+// newCachingHandler returns a routed handler over a real cache, and that cache.
+func newCachingHandler(t *testing.T, ttlSeconds int32) (http.Handler, *ristretto.Cache[string, string]) {
+	t.Helper()
+
+	cache, err := ristretto.NewCache(&ristretto.Config[string, string]{
+		NumCounters: 1000,
+		MaxCost:     1 << 20,
+		BufferItems: 64,
+		Metrics:     true,
+	})
+	if err != nil {
+		t.Fatalf("new cache: %s", err)
+	}
+	t.Cleanup(cache.Close)
+
+	s := &shortener{queries: testQueries, baseURL: testBaseURL, ttlSeconds: ttlSeconds, cache: cache}
+
+	return s.routes(), cache
+}
+
+// awaitClicks polls until shortCode reports want clicks, since a cached redirect records them asynchronously.
+func awaitClicks(t *testing.T, h http.Handler, shortCode string, want int64) {
+	t.Helper()
+
+	var got int64
+	for range 50 {
+		if got = fetchStats(t, h, shortCode).Clicks; got == want {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	t.Errorf("clicks = %d, want %d", got, want)
+}
+
+func TestRedirectServesFromCache(t *testing.T) {
+	t.Parallel()
+
+	const originalURL = "https://example.com/cached"
+
+	h, cache := newCachingHandler(t, liveTTLSeconds)
+	resp := createURL(t, h, originalURL)
+	cache.Wait()
+
+	rec := click(t, h, resp.ShortCode)
+	if got := rec.Header().Get("Location"); got != originalURL {
+		t.Errorf("location = %q, want %q", got, originalURL)
+	}
+	if hits := cache.Metrics.Hits(); hits != 1 {
+		t.Errorf("cache hits = %d, want 1", hits)
+	}
+
+	awaitClicks(t, h, resp.ShortCode, 1)
+}
+
+func TestRedirectCachesDatabaseLookup(t *testing.T) {
+	t.Parallel()
+
+	const originalURL = "https://example.com/warmed"
+
+	writer, _ := newCachingHandler(t, liveTTLSeconds)
+	resp := createURL(t, writer, originalURL)
+
+	// A second handler starts cold, so the first click has to reach the database.
+	reader, cache := newCachingHandler(t, liveTTLSeconds)
+	click(t, reader, resp.ShortCode)
+	if misses := cache.Metrics.Misses(); misses != 1 {
+		t.Errorf("cache misses = %d, want 1", misses)
+	}
+	cache.Wait()
+
+	click(t, reader, resp.ShortCode)
+	if hits := cache.Metrics.Hits(); hits != 1 {
+		t.Errorf("cache hits after warming = %d, want 1", hits)
 	}
 }

@@ -1,16 +1,19 @@
 package main
 
 import (
+	"context"
 	_ "embed"
 	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
 	"net/url"
+	"time"
 
 	db "github.com/Salad109/url-shortener/db/generated"
 	"github.com/Salad109/url-shortener/transcoding"
 
+	"github.com/dgraph-io/ristretto/v2"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -33,6 +36,7 @@ const maxRequestBytes = 2048
 // shortener holds the dependencies shared by every handler.
 type shortener struct {
 	queries    *db.Queries
+	cache      *ristretto.Cache[string, string]
 	baseURL    string
 	ttlSeconds int32
 }
@@ -109,6 +113,19 @@ func (s *shortener) handleRedirect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check cache first
+	if originalURL, found := s.cache.Get(shortCode); found {
+		// Update stats asynchronously on hit
+		asyncCtx := context.WithoutCancel(ctx)
+		go func() {
+			if err := s.queries.UpdateStats(asyncCtx, db.UpdateStatsParams{ID: id, TTLSeconds: s.ttlSeconds}); err != nil {
+				log.Println("Failed to update stats:", err)
+			}
+		}()
+		http.Redirect(w, r, originalURL, http.StatusFound)
+		return
+	}
+
 	// Record the click, extend the TTL and fetch the original URL
 	originalURL, err := s.queries.ProcessClick(ctx, db.ProcessClickParams{ID: id, TTLSeconds: s.ttlSeconds})
 	if err != nil {
@@ -122,6 +139,9 @@ func (s *shortener) handleRedirect(w http.ResponseWriter, r *http.Request) {
 		writeHTML(w, http.StatusInternalServerError, errorPage)
 		return
 	}
+
+	// Cache the result
+	s.cache.SetWithTTL(shortCode, originalURL, int64(len(originalURL)), time.Duration(s.ttlSeconds)*time.Second)
 
 	http.Redirect(w, r, originalURL, http.StatusFound)
 }
@@ -178,6 +198,9 @@ func (s *shortener) handleCreate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, "Failed to create short URL")
 		return
 	}
+
+	// Cache the new code
+	s.cache.SetWithTTL(shortCode, req.OriginalURL, int64(len(req.OriginalURL)), time.Duration(s.ttlSeconds)*time.Second)
 
 	resp := CreateURLResponse{
 		ShortCode: shortCode,

@@ -6,6 +6,7 @@ import (
 	"math"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -17,11 +18,12 @@ type config struct {
 	urlTTL          time.Duration
 	cleanupInterval time.Duration
 	requestTimeout  time.Duration
+	cacheSize       int64
 }
 
 // loadConfig reads and validates all environment variables.
 func loadConfig() (config, error) {
-	var dbErr, baseURLErr, ttlErr, cleanupErr, timeoutErr error
+	var dbErr, baseURLErr, ttlErr, cleanupErr, timeoutErr, cacheErr error
 
 	cfg := config{databaseURL: os.Getenv("DATABASE_URL")}
 	if cfg.databaseURL == "" {
@@ -39,7 +41,9 @@ func loadConfig() (config, error) {
 
 	cfg.requestTimeout, timeoutErr = envDuration("REQUEST_TIMEOUT", 5*time.Second)
 
-	return cfg, errors.Join(dbErr, baseURLErr, ttlErr, cleanupErr, timeoutErr)
+	cfg.cacheSize, cacheErr = envInt64("CACHE_SIZE", 4*1024*1024)
+
+	return cfg, errors.Join(dbErr, baseURLErr, ttlErr, cleanupErr, timeoutErr, cacheErr)
 }
 
 func (c config) ttlSeconds() int32 {
@@ -77,4 +81,22 @@ func envDuration(key string, fallback time.Duration) (time.Duration, error) {
 	}
 
 	return duration, nil
+}
+
+// envInt64 reads a positive int64 variable.
+func envInt64(key string, fallback int64) (int64, error) {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback, nil
+	}
+
+	i, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("%s: %q is not an integer", key, value)
+	}
+	if i <= 0 {
+		return 0, fmt.Errorf("%s: %q must be positive", key, value)
+	}
+
+	return i, nil
 }

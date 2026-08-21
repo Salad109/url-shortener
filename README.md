@@ -115,18 +115,37 @@ Widening the space is a relatively straightforward change. It just needs a 128-b
 **No index except the primary key** - the scrambling trick makes the short code the ID, so the only index needed is the
 primary key, on a column that never changes. Postgres can only do an in-place HOT update when no indexed column changes,
 and every click rewrites `expires_at`, which used to be indexed to speed up expiry checks. Dropping it took HOT updates
-from 0% to ~99% and WAL per click from ~380 B to ~200 B. Measured:
+from 0% to ~99% and WAL per click from ~345 B to ~185 B. Measured:
 
-| Redirects/s | p50 indexless | p50 indexed | p95 indexless | p95 indexed |
-|-------------|---------------|-------------|---------------|-------------|
-| 5,000       | 1.30 ms       | 1.31 ms     | 1.53 ms       | 1.53 ms     |
-| 15,000      | 1.40 ms       | 1.43 ms     | 2.19 ms       | 3.25 ms     |
-| 20,000      | 1.44 ms       | 1.52 ms     | 3.74 ms       | 5.54 ms     |
-| 25,000      | 1.63 ms       | 1.78 ms     | 18.68 ms      | 36.23 ms    |
-| 30,000      | 29.49 ms      | 129.48 ms   | 91.19 ms      | 152.20 ms   |
+| Requests/s | p50 indexless | p50 indexed | p95 indexless | p95 indexed | dropped indexless | dropped indexed |
+|------------|---------------|-------------|---------------|-------------|-------------------|-----------------|
+| 10,000     | 1.37 ms       | 1.41 ms     | 2.15 ms       | 2.39 ms     | 0%                | 0%              |
+| 15,000     | 1.49 ms       | 1.54 ms     | 3.72 ms       | 5.40 ms     | 0%                | 0%              |
+| 20,000     | 1.65 ms       | 1.77 ms     | 32.91 ms      | 99.84 ms    | 0%                | 0%              |
+| 25,000     | 10.53 ms      | 487.95 ms   | 351.04 ms     | 553.14 ms   | 0%                | 1.15%           |
+| 30,000     | 729.88 ms     | 764.73 ms   | 829.81 ms     | 923.86 ms   | 11.02%            | 15.93%          |
 
-Below 15k RPS they are indistinguishable, so under light load the index is free. Where it actually costs is in the
-headroom: at 30k RPS the indexless build degrades to 29 ms, while the indexed one degrades to 129 ms.
+Below 20k they are indistinguishable, so under light load the index is free. It costs headroom instead: the highest rate
+served without dropping is 24k indexless against 22k indexed, and at 25k the indexless build still answers in 10 ms
+while the indexed one is already at 488 ms. The extra index maintenance roughly doubles Postgres CPU usage. By 30k both
+are saturated.
+
+**In-memory cache in front of lookups** - a short code's URL is cached on creation and every database hit, with the
+cache entries having the same TTL as the database rows. A cache hit skips the query entirely, short-circuiting the
+redirect and recording the click asynchronously in the background. Measured:
+
+| Requests/s | p50 cacheless | p50 cached | p95 cacheless | p95 cached | dropped cacheless | dropped cached |
+|------------|---------------|------------|---------------|------------|-------------------|----------------|
+| 20,000     | 1.65 ms       | 0.07 ms    | 32.91 ms      | 0.32 ms    | 0%                | 0%             |
+| 25,000     | 10.53 ms      | 0.08 ms    | 351.04 ms     | 0.63 ms    | 0%                | 0%             |
+| 30,000     | 729.88 ms     | 0.12 ms    | 829.81 ms     | 28.63 ms   | 11.02%            | 4.97%          |
+| 35,000     | 739.43 ms     | 0.13 ms    | 836.99 ms     | 67.76 ms   | 23.92%            | 12.12%         |
+| 40,000     | 729.03 ms     | 0.15 ms    | 833.24 ms     | 207.16 ms  | 32.82%            | 27.21%         |
+
+A hit returns the URL from memory and makes the click a background write, so the redirect is decoupled from the
+bookkeeping. That explains why latency falls 20x to 130x while throughput barely moves: essentially the same query still
+runs, it's just the redirect stops waiting for the database return. The drop-free ceiling goes from 24k to 26k
+requests/s.
 
 **Soft expiry before deletion** - every read carries `AND expires_at > now()`, so a link appears dead on time, no matter
 when the scheduled deletion sweep runs.
@@ -138,6 +157,7 @@ forward and returns the URL all in a single query.
 
 - Go standard library
 - Postgres + pgx
+- ristretto for the lookup cache
 - sqlc for handwritten SQL
 - goose for migrations
 - Docker Compose

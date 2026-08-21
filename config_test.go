@@ -10,7 +10,7 @@ import (
 func setEnv(t *testing.T, env map[string]string) {
 	t.Helper()
 
-	for _, key := range []string{"DATABASE_URL", "BASE_URL", "URL_TTL", "CLEANUP_INTERVAL", "REQUEST_TIMEOUT"} {
+	for _, key := range []string{"DATABASE_URL", "BASE_URL", "URL_TTL", "CLEANUP_INTERVAL", "REQUEST_TIMEOUT", "CACHE_SIZE"} {
 		t.Setenv(key, env[key])
 	}
 }
@@ -30,6 +30,7 @@ func TestLoadConfigAccepts(t *testing.T) {
 				urlTTL:          5 * time.Minute,
 				cleanupInterval: time.Minute,
 				requestTimeout:  5 * time.Second,
+				cacheSize:       4 * 1024 * 1024,
 			},
 		},
 		{
@@ -40,6 +41,7 @@ func TestLoadConfigAccepts(t *testing.T) {
 				"URL_TTL":          "48h",
 				"CLEANUP_INTERVAL": "30s",
 				"REQUEST_TIMEOUT":  "2s",
+				"CACHE_SIZE":       "8388608",
 			},
 			config{
 				databaseURL:     "postgres://localhost/db",
@@ -47,6 +49,7 @@ func TestLoadConfigAccepts(t *testing.T) {
 				urlTTL:          48 * time.Hour,
 				cleanupInterval: 30 * time.Second,
 				requestTimeout:  2 * time.Second,
+				cacheSize:       8 * 1024 * 1024,
 			},
 		},
 	}
@@ -83,10 +86,13 @@ func TestLoadConfigRejects(t *testing.T) {
 		{"ttl over the int32 ceiling", map[string]string{"DATABASE_URL": valid, "URL_TTL": "1000000h"}, []string{"URL_TTL"}},
 		{"zero cleanup interval", map[string]string{"DATABASE_URL": valid, "CLEANUP_INTERVAL": "0s"}, []string{"CLEANUP_INTERVAL"}},
 		{"unparseable timeout", map[string]string{"DATABASE_URL": valid, "REQUEST_TIMEOUT": "maybe"}, []string{"REQUEST_TIMEOUT"}},
+		{"unparseable cache size", map[string]string{"DATABASE_URL": valid, "CACHE_SIZE": "4MB"}, []string{"CACHE_SIZE"}},
+		{"zero cache size", map[string]string{"DATABASE_URL": valid, "CACHE_SIZE": "0"}, []string{"CACHE_SIZE"}},
+		{"negative cache size", map[string]string{"DATABASE_URL": valid, "CACHE_SIZE": "-1"}, []string{"CACHE_SIZE"}},
 		{
 			"every variable at once",
-			map[string]string{"BASE_URL": "no", "URL_TTL": "no", "CLEANUP_INTERVAL": "no", "REQUEST_TIMEOUT": "no"},
-			[]string{"DATABASE_URL", "BASE_URL", "URL_TTL", "CLEANUP_INTERVAL", "REQUEST_TIMEOUT"},
+			map[string]string{"BASE_URL": "no", "URL_TTL": "no", "CLEANUP_INTERVAL": "no", "REQUEST_TIMEOUT": "no", "CACHE_SIZE": "no"},
+			[]string{"DATABASE_URL", "BASE_URL", "URL_TTL", "CLEANUP_INTERVAL", "REQUEST_TIMEOUT", "CACHE_SIZE"},
 		},
 	}
 

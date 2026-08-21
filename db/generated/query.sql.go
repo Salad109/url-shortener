@@ -11,7 +11,8 @@ import (
 
 const addURL = `-- name: AddURL :one
 INSERT INTO urls (original_url, expires_at)
-VALUES ($1, now() + ($2::int * INTERVAL '1 second')) RETURNING id, original_url, created_at, click_count, last_clicked_at, expires_at
+VALUES ($1, now() + ($2::int * INTERVAL '1 second'))
+RETURNING id, original_url, created_at, click_count, last_clicked_at, expires_at
 `
 
 type AddURLParams struct {
@@ -77,7 +78,8 @@ SET click_count     = click_count + 1,
     last_clicked_at = now(),
     expires_at      = now() + ($1::int * INTERVAL '1 second')
 WHERE id = $2
-  AND expires_at > now() RETURNING original_url
+  AND expires_at > now()
+RETURNING original_url
 `
 
 type ProcessClickParams struct {
@@ -90,4 +92,23 @@ func (q *Queries) ProcessClick(ctx context.Context, arg ProcessClickParams) (str
 	var original_url string
 	err := row.Scan(&original_url)
 	return original_url, err
+}
+
+const updateStats = `-- name: UpdateStats :exec
+UPDATE urls
+SET click_count     = click_count + 1,
+    last_clicked_at = now(),
+    expires_at      = now() + ($1::int * INTERVAL '1 second')
+WHERE id = $2
+  AND expires_at > now()
+`
+
+type UpdateStatsParams struct {
+	TTLSeconds int32
+	ID         int64
+}
+
+func (q *Queries) UpdateStats(ctx context.Context, arg UpdateStatsParams) error {
+	_, err := q.db.Exec(ctx, updateStats, arg.TTLSeconds, arg.ID)
+	return err
 }
