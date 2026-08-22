@@ -72,6 +72,21 @@ func TestMergeUpdates(t *testing.T) {
 	}
 }
 
+func TestRecordClickCountsDrops(t *testing.T) {
+	// Capacity one makes the channel full after a single click.
+	full := make(chan StatUpdate, 1)
+
+	recordClick(full, 1)
+	recordClick(full, 2)
+
+	if queued := len(full); queued != 1 {
+		t.Errorf("queued = %d, want 1", queued)
+	}
+	if dropped := droppedClicks.Swap(0); dropped != 1 {
+		t.Errorf("dropped = %d, want 1", dropped)
+	}
+}
+
 func TestFlushUpdates(t *testing.T) {
 	t.Parallel()
 

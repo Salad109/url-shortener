@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"sync/atomic"
 	"time"
 
 	db "github.com/Salad109/url-shortener/db/generated"
@@ -11,7 +12,7 @@ import (
 )
 
 const (
-	updateBatchSize = 1000
+	updateBatchSize = 4000
 	updateInterval  = time.Second
 	updateChanSize  = 100_000
 )
@@ -21,6 +22,9 @@ type StatUpdate struct {
 	Clicks    int64
 	Timestamp time.Time
 }
+
+// droppedClicks counts clicks the updater could not take each tick.
+var droppedClicks atomic.Int64
 
 // runStatUpdater batches and updates URL stats.
 func runStatUpdater(ctx context.Context, queries *db.Queries, ttlSeconds int32, updateChan chan StatUpdate) {
@@ -38,6 +42,7 @@ func runStatUpdater(ctx context.Context, queries *db.Queries, ttlSeconds int32, 
 			flush = len(buf) >= updateBatchSize
 		case <-ticker.C:
 			flush = len(buf) > 0
+			reportDroppedClicks()
 		}
 
 		if flush {
@@ -47,11 +52,19 @@ func runStatUpdater(ctx context.Context, queries *db.Queries, ttlSeconds int32, 
 	}
 }
 
-// recordClick queues one click for id, dropping it when the batcher has fallen behind.
+// recordClick queues one click for id, counting it as dropped when the batcher has fallen behind.
 func recordClick(ch chan<- StatUpdate, id int64) {
 	select {
 	case ch <- StatUpdate{ID: id, Clicks: 1, Timestamp: time.Now()}:
 	default:
+		droppedClicks.Add(1)
+	}
+}
+
+// reportDroppedClicks logs and resets the count.
+func reportDroppedClicks() {
+	if dropped := droppedClicks.Swap(0); dropped > 0 {
+		log.Printf("Dropped %d clicks. The stat updater is behind", dropped)
 	}
 }
 
