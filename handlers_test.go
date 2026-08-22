@@ -275,8 +275,8 @@ func TestStaticRoutes(t *testing.T) {
 	}
 }
 
-// newCachingHandler returns a routed handler over a real cache, and that cache.
-func newCachingHandler(t *testing.T, ttlSeconds int32) (http.Handler, *ristretto.Cache[string, string]) {
+// newCachingHandler returns a routed handler over a real cache, that cache, and the channel its clicks buffer into.
+func newCachingHandler(t *testing.T, ttlSeconds int32) (http.Handler, *ristretto.Cache[string, string], chan StatUpdate) {
 	t.Helper()
 
 	cache, err := ristretto.NewCache(&ristretto.Config[string, string]{
@@ -290,24 +290,23 @@ func newCachingHandler(t *testing.T, ttlSeconds int32) (http.Handler, *ristretto
 	}
 	t.Cleanup(cache.Close)
 
-	s := &shortener{queries: testQueries, baseURL: testBaseURL, ttlSeconds: ttlSeconds, cache: cache}
+	updateChan := make(chan StatUpdate, updateBatchSize)
+	s := &shortener{queries: testQueries, baseURL: testBaseURL, ttlSeconds: ttlSeconds, cache: cache, updateChan: updateChan}
 
-	return s.routes(), cache
+	return s.routes(), cache, updateChan
 }
 
-// awaitClicks polls until shortCode reports want clicks, since a cached redirect records them asynchronously.
-func awaitClicks(t *testing.T, h http.Handler, shortCode string, want int64) {
+// flushClicks merges everything buffered in ch and writes it, standing in for runStatUpdater.
+func flushClicks(t *testing.T, ch chan StatUpdate, ttlSeconds int32) {
 	t.Helper()
 
-	var got int64
-	for range 50 {
-		if got = fetchStats(t, h, shortCode).Clicks; got == want {
-			return
-		}
-		time.Sleep(20 * time.Millisecond)
+	buf := make(map[int64]StatUpdate)
+	for len(ch) > 0 {
+		update := <-ch
+		buf[update.ID] = mergeUpdates(buf[update.ID], update)
 	}
 
-	t.Errorf("clicks = %d, want %d", got, want)
+	flushUpdates(t.Context(), testQueries, ttlSeconds, buf)
 }
 
 func TestRedirectServesFromCache(t *testing.T) {
@@ -315,7 +314,7 @@ func TestRedirectServesFromCache(t *testing.T) {
 
 	const originalURL = "https://example.com/cached"
 
-	h, cache := newCachingHandler(t, liveTTLSeconds)
+	h, cache, updates := newCachingHandler(t, liveTTLSeconds)
 	resp := createURL(t, h, originalURL)
 	cache.Wait()
 
@@ -327,7 +326,11 @@ func TestRedirectServesFromCache(t *testing.T) {
 		t.Errorf("cache hits = %d, want 1", hits)
 	}
 
-	awaitClicks(t, h, resp.ShortCode, 1)
+	flushClicks(t, updates, liveTTLSeconds)
+
+	if got := fetchStats(t, h, resp.ShortCode).Clicks; got != 1 {
+		t.Errorf("clicks = %d, want 1", got)
+	}
 }
 
 func TestRedirectCachesDatabaseLookup(t *testing.T) {
@@ -335,11 +338,11 @@ func TestRedirectCachesDatabaseLookup(t *testing.T) {
 
 	const originalURL = "https://example.com/warmed"
 
-	writer, _ := newCachingHandler(t, liveTTLSeconds)
+	writer, _, _ := newCachingHandler(t, liveTTLSeconds)
 	resp := createURL(t, writer, originalURL)
 
 	// A second handler starts cold, so the first click has to reach the database.
-	reader, cache := newCachingHandler(t, liveTTLSeconds)
+	reader, cache, _ := newCachingHandler(t, liveTTLSeconds)
 	click(t, reader, resp.ShortCode)
 	if misses := cache.Metrics.Misses(); misses != 1 {
 		t.Errorf("cache misses = %d, want 1", misses)

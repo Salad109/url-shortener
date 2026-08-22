@@ -51,9 +51,14 @@ func main() {
 	}
 	defer cache.Close()
 
-	s := &shortener{queries: queries, baseURL: cfg.baseURL, ttlSeconds: cfg.ttlSeconds(), cache: cache}
+	ttlSeconds := cfg.ttlSeconds()
+	updateChan := make(chan StatUpdate, updateChanSize)
+
+	s := &shortener{queries: queries, baseURL: cfg.baseURL, ttlSeconds: ttlSeconds, cache: cache, updateChan: updateChan}
 
 	go runCleanup(ctx, queries, cfg.cleanupInterval)
+
+	go runStatUpdater(ctx, queries, ttlSeconds, updateChan)
 
 	log.Println("URL TTL is", cfg.urlTTL)
 	log.Println("Expired URLs are deleted every", cfg.cleanupInterval)

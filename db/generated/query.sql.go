@@ -7,6 +7,8 @@ package generated
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const addURL = `-- name: AddURL :one
@@ -32,6 +34,35 @@ func (q *Queries) AddURL(ctx context.Context, arg AddURLParams) (URL, error) {
 		&i.ExpiresAt,
 	)
 	return i, err
+}
+
+const batchUpdateStats = `-- name: BatchUpdateStats :exec
+UPDATE urls
+SET click_count     = click_count + arr.clicks,
+    last_clicked_at = arr.timestamp,
+    expires_at      = arr.timestamp + ($1::int * INTERVAL '1 second')
+FROM (SELECT unnest($2::bigint[])             AS id,
+             unnest($3::bigint[])          AS clicks,
+             unnest($4::timestamptz[]) AS timestamp) AS arr
+WHERE urls.id = arr.id
+  AND urls.expires_at > arr.timestamp
+`
+
+type BatchUpdateStatsParams struct {
+	TTLSeconds int32
+	Ids        []int64
+	Clicks     []int64
+	Timestamps []pgtype.Timestamptz
+}
+
+func (q *Queries) BatchUpdateStats(ctx context.Context, arg BatchUpdateStatsParams) error {
+	_, err := q.db.Exec(ctx, batchUpdateStats,
+		arg.TTLSeconds,
+		arg.Ids,
+		arg.Clicks,
+		arg.Timestamps,
+	)
+	return err
 }
 
 const deleteExpiredURLs = `-- name: DeleteExpiredURLs :execrows
@@ -92,23 +123,4 @@ func (q *Queries) ProcessClick(ctx context.Context, arg ProcessClickParams) (str
 	var original_url string
 	err := row.Scan(&original_url)
 	return original_url, err
-}
-
-const updateStats = `-- name: UpdateStats :exec
-UPDATE urls
-SET click_count     = click_count + 1,
-    last_clicked_at = now(),
-    expires_at      = now() + ($1::int * INTERVAL '1 second')
-WHERE id = $2
-  AND expires_at > now()
-`
-
-type UpdateStatsParams struct {
-	TTLSeconds int32
-	ID         int64
-}
-
-func (q *Queries) UpdateStats(ctx context.Context, arg UpdateStatsParams) error {
-	_, err := q.db.Exec(ctx, updateStats, arg.TTLSeconds, arg.ID)
-	return err
 }

@@ -12,13 +12,16 @@ WHERE id = sqlc.arg(id)
   AND expires_at > now()
 RETURNING original_url;
 
--- name: UpdateStats :exec
+-- name: BatchUpdateStats :exec
 UPDATE urls
-SET click_count     = click_count + 1,
-    last_clicked_at = now(),
-    expires_at      = now() + (sqlc.arg(ttl_seconds)::int * INTERVAL '1 second')
-WHERE id = sqlc.arg(id)
-  AND expires_at > now();
+SET click_count     = click_count + arr.clicks,
+    last_clicked_at = arr.timestamp,
+    expires_at      = arr.timestamp + (sqlc.arg(ttl_seconds)::int * INTERVAL '1 second')
+FROM (SELECT unnest(@ids::bigint[])             AS id,
+             unnest(@clicks::bigint[])          AS clicks,
+             unnest(@timestamps::timestamptz[]) AS timestamp) AS arr
+WHERE urls.id = arr.id
+  AND urls.expires_at > arr.timestamp;
 
 -- name: GetStatsByID :one
 SELECT *

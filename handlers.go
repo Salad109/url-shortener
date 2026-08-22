@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	_ "embed"
 	"encoding/json"
 	"errors"
@@ -39,6 +38,7 @@ type shortener struct {
 	cache      *ristretto.Cache[string, string]
 	baseURL    string
 	ttlSeconds int32
+	updateChan chan StatUpdate
 }
 
 func (s *shortener) routes() http.Handler {
@@ -115,13 +115,7 @@ func (s *shortener) handleRedirect(w http.ResponseWriter, r *http.Request) {
 
 	// Check cache first
 	if originalURL, found := s.cache.Get(shortCode); found {
-		// Update stats asynchronously on hit
-		asyncCtx := context.WithoutCancel(ctx)
-		go func() {
-			if err := s.queries.UpdateStats(asyncCtx, db.UpdateStatsParams{ID: id, TTLSeconds: s.ttlSeconds}); err != nil {
-				log.Println("Failed to update stats:", err)
-			}
-		}()
+		recordClick(s.updateChan, id)
 		http.Redirect(w, r, originalURL, http.StatusFound)
 		return
 	}
