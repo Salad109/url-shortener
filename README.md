@@ -112,46 +112,67 @@ Widening the space is a relatively straightforward change. It just needs a 128-b
 
 ## Optimizations
 
-**No index except the primary key** - the scrambling trick makes the short code the ID, so the only index needed is the
-primary key, on a column that never changes. Postgres can only do an in-place HOT update when no indexed column changes,
-and every click rewrites `expires_at`, which used to be indexed to speed up expiry checks. Dropping it took HOT updates
-from 0% to ~99% and WAL per click from ~345 B to ~185 B. Measured:
-
-| Requests/s | p50 indexless | p50 indexed | p95 indexless | p95 indexed | dropped indexless | dropped indexed |
-|------------|---------------|-------------|---------------|-------------|-------------------|-----------------|
-| 10,000     | 1.37 ms       | 1.41 ms     | 2.15 ms       | 2.39 ms     | 0%                | 0%              |
-| 15,000     | 1.49 ms       | 1.54 ms     | 3.72 ms       | 5.40 ms     | 0%                | 0%              |
-| 20,000     | 1.65 ms       | 1.77 ms     | 32.91 ms      | 99.84 ms    | 0%                | 0%              |
-| 25,000     | 10.53 ms      | 487.95 ms   | 351.04 ms     | 553.14 ms   | 0%                | 1.15%           |
-| 30,000     | 729.88 ms     | 764.73 ms   | 829.81 ms     | 923.86 ms   | 11.02%            | 15.93%          |
-
-Below 20k they are indistinguishable, so under light load the index is free. It costs headroom instead: the highest rate
-served without dropping is 24k indexless against 22k indexed, and at 25k the indexless build still answers in 10 ms
-while the indexed one is already at 488 ms. The extra index maintenance roughly doubles Postgres CPU usage. By 30k both
-are saturated.
-
-**In-memory cache in front of lookups** - a short code's URL is cached on creation and every database hit, with the
-cache entries having the same TTL as the database rows. A cache hit skips the query entirely, short-circuiting the
-redirect and recording the click asynchronously in the background. Measured:
-
-| Requests/s | p50 cacheless | p50 cached | p95 cacheless | p95 cached | dropped cacheless | dropped cached |
-|------------|---------------|------------|---------------|------------|-------------------|----------------|
-| 20,000     | 1.65 ms       | 0.07 ms    | 32.91 ms      | 0.32 ms    | 0%                | 0%             |
-| 25,000     | 10.53 ms      | 0.08 ms    | 351.04 ms     | 0.63 ms    | 0%                | 0%             |
-| 30,000     | 729.88 ms     | 0.12 ms    | 829.81 ms     | 28.63 ms   | 11.02%            | 4.97%          |
-| 35,000     | 739.43 ms     | 0.13 ms    | 836.99 ms     | 67.76 ms   | 23.92%            | 12.12%         |
-| 40,000     | 729.03 ms     | 0.15 ms    | 833.24 ms     | 207.16 ms  | 32.82%            | 27.21%         |
-
-A hit returns the URL from memory and makes the click a background write, so the redirect is decoupled from the
-bookkeeping. That explains why latency falls 20x to 130x while throughput barely moves: essentially the same query still
-runs, it's just the redirect stops waiting for the database return. The drop-free ceiling goes from 24k to 26k
-requests/s.
-
 **Soft expiry before deletion** - every read carries `AND expires_at > now()`, so a link appears dead on time, no matter
 when the scheduled deletion sweep runs.
 
 **One statement per click** - `ProcessClick` increments the counter, stamps `last_clicked_at`, pushes `expires_at`
 forward and returns the URL all in a single query.
+
+**No index except the primary key** - the scrambling trick makes the short code the ID, so the only index needed is the
+primary key, on a column that never changes. Postgres can only do an in-place HOT update when no indexed column changes,
+and every click rewrites `expires_at`, which used to be indexed to speed up expiry checks. That turned every click into
+a full tuple rewrite.
+
+Measured at 5,000 requests/s: dropping the index takes HOT updates from 0% to 98% and WAL per click from 394 B to 234 B,
+at the same Postgres CPU usage. Throughput improvement is minor, at under 5%. Dropping the index is database hygiene
+more than performance gains.
+
+**In-memory cache in front of lookups** - a short code's URL is cached on creation and every database hit, with the
+cache entries having the same TTL as the database rows. A cache hit skips the query entirely, short-circuiting the
+redirect and recording the click asynchronously in the background. Measured:
+
+| Requests/s | p50 uncached | p50 cached | p95 uncached | p95 cached |
+|------------|--------------|------------|--------------|------------|
+| 2,000      | 1.28 ms      | 0.09 ms    | 1.97 ms      | 0.17 ms    |
+| 10,000     | 2.08 ms      | 0.09 ms    | 6.49 ms      | 0.40 ms    |
+| 14,500     | 4.62 ms      | 0.12 ms    | 78.49 ms     | 0.81 ms    |
+| 15,000     | 113.69 ms    | 0.12 ms    | 163.27 ms    | 0.85 ms    |
+| 20,000     | 750.32 ms    | 0.23 ms    | 857.41 ms    | 26.56 ms   |
+
+The uncached build degrades gradually from 2,000 to 14,500 requests/s, then falls off a cliff as it approaches the
+~16,000 commits a second Postgres can sustain. The cached build does not visibly break anywhere in this table, because
+the database backlog is masked by a cache that redirects from memory.
+
+The write is still one `UPDATE` per click, just fired from a detached goroutine, so every click still costs a
+transaction. Counting clicks that actually reached the table against the load window plus the time the app needed to
+catch up afterward, the cached build lands 16,216/s at 20,000 RPS, 16,020/s at 28,000 and 15,015/s at 40,000 - pinned,
+while the hidden backlog grows from 7 s to 22 s to 47 s. Both builds top out around 15,000-16,000 clicks/s because both
+are doing the exact same write to Postgres.
+
+**Batched click stats** - a cache hit sends a click event to a batching channel. One goroutine writes them in a single
+`unnest` query, flushing on 4000 distinct IDs or one second. Both builds serve everything offered up to 30,000, so the
+axis is commits - and, higher up, whether the clicks survive at all. Measured:
+
+| Requests/s | commits/s per-click | commits/s batched | clicks dropped batched |
+|------------|---------------------|-------------------|------------------------|
+| 2,000      | 1,829               | 2                 | 0                      |
+| 20,000     | 15,788              | 6                 | 0                      |
+| 40,000     | 14,783              | 10                | 0                      |
+| 50,000     | 15,207              | 12                | 0                      |
+| 60,000     | 15,656              | 5                 | 1,142,049              |
+| 70,000     | 16,026              | 4                 | 1,391,129              |
+
+The per-click build flatlines from 20,000 upward, hitting the same ceiling as the builds above. It cannot commit faster,
+so every request above it goes into the backlog. Batching thousands of clicks per commit solves the problem, making WAL
+per click go from 198 B to 115 B, and Postgres CPU from 104% to 37%.
+
+The batched build's backlog is also bounded, unlike the per-click build. Holding 30,000 requests/s and increasing the
+load window, the per-click build needs 25s, 51s and 109s to catch up after 30s, 60s and 120s of load, while the batched
+build holds at 1s. Sustained throughput increased from ~15,000/s to ~50,000/s.
+
+That limit comes from running the stack on a two-core machine, not the app. Serving HTTP crowds the run queue, so the
+batcher's single goroutine stops being scheduled often enough to drain the channel and the non-blocking send starts
+discarding. The same binary on four cores handles 60,000 without losing a click.
 
 ## Tech stack
 
