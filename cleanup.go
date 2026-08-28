@@ -8,7 +8,10 @@ import (
 	db "github.com/Salad109/url-shortener/db/generated"
 )
 
-const cleanupBatchSize = 1000
+const (
+	cleanupBatchSize = 1000
+	cleanupTimeout   = 10 * time.Second
+)
 
 // runCleanup periodically deletes expired URLs until the process exits.
 func runCleanup(ctx context.Context, queries *db.Queries, interval time.Duration) {
@@ -23,7 +26,10 @@ func runCleanup(ctx context.Context, queries *db.Queries, interval time.Duration
 // deleteExpired removes expired URLs in batches until none are left.
 func deleteExpired(ctx context.Context, queries *db.Queries) {
 	for {
-		deleted, err := queries.DeleteExpiredURLs(ctx, cleanupBatchSize)
+		queryCtx, cancel := context.WithTimeout(ctx, cleanupTimeout)
+		deleted, err := queries.DeleteExpiredURLs(queryCtx, cleanupBatchSize)
+		cancel()
+
 		if err != nil {
 			log.Println("Failed to delete expired URLs:", err)
 			return

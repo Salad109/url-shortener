@@ -15,6 +15,7 @@ const (
 	updateBatchSize = 4000
 	updateInterval  = time.Second
 	updateChanSize  = 100_000
+	updateTimeout   = 5 * time.Second
 )
 
 type StatUpdate struct {
@@ -92,7 +93,10 @@ func flushUpdates(ctx context.Context, queries *db.Queries, ttlSeconds int32, up
 		timestamps = append(timestamps, pgtype.Timestamptz{Time: update.Timestamp, Valid: true})
 	}
 
-	if err := queries.BatchUpdateStats(ctx, db.BatchUpdateStatsParams{
+	queryCtx, cancel := context.WithTimeout(ctx, updateTimeout)
+	defer cancel()
+
+	if err := queries.BatchUpdateStats(queryCtx, db.BatchUpdateStatsParams{
 		TTLSeconds: ttlSeconds,
 		Ids:        ids,
 		Clicks:     clicks,
