@@ -145,34 +145,60 @@ the database backlog is masked by a cache that redirects from memory.
 
 The write is still one `UPDATE` per click, just fired from a detached goroutine, so every click still costs a
 transaction. Counting clicks that actually reached the table against the load window plus the time the app needed to
-catch up afterward, the cached build lands 16,216/s at 20,000 RPS, 16,020/s at 28,000 and 15,015/s at 40,000 - pinned,
-while the hidden backlog grows from 7 s to 22 s to 47 s. Both builds top out around 15,000-16,000 clicks/s because both
-are doing the exact same write to Postgres.
+catch up afterward, the cached build is pinned: 16,216/s at 20,000 RPS, 16,020/s at 28,000 and 15,015/s at 40,000, while
+the hidden backlog grows from 7 s to 22 s to 47 s. Both builds top out around 15,000-16,000 clicks/s because both are
+doing the exact same write to Postgres.
 
 **Batched click stats** - a cache hit sends a click event to a batching channel. One goroutine writes them in a single
-`unnest` query, flushing on 4000 distinct IDs or one second. Both builds serve everything offered up to 30,000, so the
-axis is commits - and, higher up, whether the clicks survive at all. Measured:
+`unnest` query, flushing on 4000 distinct IDs or one second. Measured:
 
-| Requests/s | commits/s per-click | commits/s batched | clicks dropped batched |
-|------------|---------------------|-------------------|------------------------|
-| 2,000      | 1,829               | 2                 | 0                      |
-| 20,000     | 15,788              | 6                 | 0                      |
-| 40,000     | 14,783              | 10                | 0                      |
-| 50,000     | 15,207              | 12                | 0                      |
-| 60,000     | 15,656              | 5                 | 1,142,049              |
-| 70,000     | 16,026              | 4                 | 1,391,129              |
+| Requests/s | per-click landed/s | per-click backlog | batched landed/s | batched backlog |
+|------------|--------------------|-------------------|------------------|-----------------|
+| 10,000     | 9,677              | 1s                | 9,677            | 1s              |
+| 20,000     | 16,216             | 7s                | 19,355           | 1s              |
+| 30,000     | 15,892             | 26s               | 29,033           | 1s              |
+| 40,000     | 15,015             | 47s               | 38,648           | 1s              |
+| 50,000     | -                  | -                 | 48,387           | 1s              |
+| 60,000     | -                  | -                 | 58,067           | 1s              |
+| 70,000     | -                  | -                 | 67,745           | 1s              |
 
-The per-click build flatlines from 20,000 upward, hitting the same ceiling as the builds above. It cannot commit faster,
-so every request above it goes into the backlog. Batching thousands of clicks per commit solves the problem, making WAL
-per click go from 198 B to 115 B, and Postgres CPU from 104% to 37%.
+The per-click build is pinned at the same ~16,000 commits/s ceiling as the uncached one, since the cache didn't
+eliminate the write transaction.
 
-The batched build's backlog is also bounded, unlike the per-click build. Holding 30,000 requests/s and increasing the
-load window, the per-click build needs 25s, 51s and 109s to catch up after 30s, 60s and 120s of load, while the batched
-build holds at 1s. Sustained throughput increased from ~15,000/s to ~50,000/s.
+Batching thousands of clicks into one commit drops WAL per click from 198 B to 115 B and Postgres CPU from 104% to 37%.
+The mechanism also bounds the backlog. Holding 30,000 requests/s over load windows of 30s, 60s and 120s, the per-click
+build needs 25s, 51s and 109s to catch up, while the batched build needs 1s at every window. Sustained throughput goes
+from ~16,000/s to ~75,000/s.
 
-That limit comes from running the stack on a two-core machine, not the app. Serving HTTP crowds the run queue, so the
-batcher's single goroutine stops being scheduled often enough to drain the channel and the non-blocking send starts
-discarding. The same binary on four cores handles 60,000 without losing a click.
+The new ceiling comes from the machine itself, not the app. Three runs with the app using various CPU counts:
+
+| Stack   | Requests/s | p50     | p95      | Clicks lost | First failing rate |
+|---------|------------|---------|----------|-------------|--------------------|
+| 2 cores | 75,000     | 1.60 ms | 54.67 ms | 0           | 80,000             |
+| 4 cores | 120,000    | 0.68 ms | 14.92 ms | 0           | 125,000            |
+| 6 cores | 135,000    | 0.24 ms | 10.21 ms | 0           | 140,000            |
+
+The smaller stacks stop because they run out of CPU. Six cores stops with capacity to spare, because past 135,000 the
+network cost per request begins feeding back on itself. Latency rises, the load generator holds more connections open to
+keep the offered rate up, kernel time per request climbs, and that raises latency again.
+
+Profiled at 60,000 requests/s on the two-core stack, a request costs 25.7 us of CPU across the whole machine. Where the
+CPU time actually goes, in microseconds:
+
+```mermaid
+sankey
+One request,Postgres,3.1
+One request,Kernel softirq,4.3
+One request,App process,18.3
+App process,Socket syscalls,7.6
+App process,Go runtime,8.1
+App process,HTTP parsing,2.3
+App process,Shortener logic,0.3
+Go runtime,Scheduler and maps,6.7
+Go runtime,Garbage collector,1.4
+```
+
+0.3 us of the 25.7 is the shortener itself. There is nothing left to optimize in the app.
 
 ## Tech stack
 
