@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -84,6 +85,22 @@ func TestRecordClickCountsDrops(t *testing.T) {
 	}
 	if dropped := droppedClicks.Swap(0); dropped != 1 {
 		t.Errorf("dropped = %d, want 1", dropped)
+	}
+}
+
+func TestFlushUpdatesCountsDrops(t *testing.T) {
+	id := addURL(t, liveTTLSeconds)
+
+	// A canceled context is the only way to fail the statement without a broken pool.
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	flushUpdates(ctx, testQueries, liveTTLSeconds, map[int64]StatUpdate{
+		id: {ID: id, Clicks: 3, Timestamp: time.Now()},
+	})
+
+	if dropped := droppedClicks.Swap(0); dropped != 3 {
+		t.Errorf("dropped = %d, want 3", dropped)
 	}
 }
 

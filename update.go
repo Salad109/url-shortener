@@ -24,7 +24,7 @@ type StatUpdate struct {
 	Timestamp time.Time
 }
 
-// droppedClicks counts clicks the updater could not take each tick.
+// droppedClicks counts clicks lost by a full channel or a failed flush.
 var droppedClicks atomic.Int64
 
 // runStatUpdater batches and updates URL stats.
@@ -35,20 +35,15 @@ func runStatUpdater(ctx context.Context, queries *db.Queries, ttlSeconds int32, 
 	defer ticker.Stop()
 
 	for {
-		var flush bool
-
 		select {
 		case update := <-updateChan:
 			buf[update.ID] = mergeUpdates(buf[update.ID], update)
-			flush = len(buf) >= updateBatchSize
+			if len(buf) >= updateBatchSize {
+				flushUpdates(ctx, queries, ttlSeconds, buf)
+			}
 		case <-ticker.C:
-			flush = len(buf) > 0
-			reportDroppedClicks()
-		}
-
-		if flush {
 			flushUpdates(ctx, queries, ttlSeconds, buf)
-			clear(buf)
+			reportDroppedClicks()
 		}
 	}
 }
@@ -65,7 +60,7 @@ func recordClick(ch chan<- StatUpdate, id int64) {
 // reportDroppedClicks logs and resets the count.
 func reportDroppedClicks() {
 	if dropped := droppedClicks.Swap(0); dropped > 0 {
-		log.Printf("Dropped %d clicks. The stat updater is behind", dropped)
+		log.Printf("Dropped %d clicks", dropped)
 	}
 }
 
@@ -78,11 +73,12 @@ func mergeUpdates(existing, update StatUpdate) StatUpdate {
 	return update
 }
 
-// flushUpdates updates the database with the given batch of stat updates.
+// flushUpdates writes the given batch of stat updates to the database and empties it.
 func flushUpdates(ctx context.Context, queries *db.Queries, ttlSeconds int32, updates map[int64]StatUpdate) {
 	if len(updates) == 0 {
 		return
 	}
+	defer clear(updates)
 
 	ids := make([]int64, 0, len(updates))
 	clicks := make([]int64, 0, len(updates))
@@ -103,5 +99,11 @@ func flushUpdates(ctx context.Context, queries *db.Queries, ttlSeconds int32, up
 		Timestamps: timestamps,
 	}); err != nil {
 		log.Println("Failed to flush updates:", err)
+
+		var lost int64
+		for _, update := range updates {
+			lost += update.Clicks
+		}
+		droppedClicks.Add(lost)
 	}
 }
